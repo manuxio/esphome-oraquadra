@@ -29,9 +29,10 @@ esp32:
     # ESPHome integration is still Arduino-only on this version.
 
 logger:
-  level: INFO
+  level: DEBUG
   # UART0 (TX=GPIO21, RX=GPIO20 on C3) is free — keep logger active for
   # diagnostics. GPIO 1 stays as I2C SCL (no conflict).
+  # On ESP32-C3 native USB, log goes to BOTH UART and USB-Serial/JTAG (COM port).
   baud_rate: 115200
 
 api:
