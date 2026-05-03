@@ -3,5 +3,12 @@
 /.docker_cache/
 /secrets.yaml
 /build*.log
+/ota-*.log
+/live-logs.log
+# Local debug scripts (often hardcode the API encryption key — never commit)
+/test_notify.py
+/find_device.py
+/get_ip.py
+/get_ip2.py
 __pycache__/
 *.pyc
