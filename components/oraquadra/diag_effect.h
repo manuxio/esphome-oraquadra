@@ -1,15 +1,12 @@
 #pragma once
 
-// Diagnostic test pattern — a fully static frame that should NEVER change
-// pixel by pixel between frames. Use this to isolate hardware/data-line
-// flicker from software flicker:
-//   - paint a hue gradient on the inner 14×14 (each pixel = unique colour)
-//   - ring the cornice with bright primaries (R/G/B repeating)
-//   - corner markers always pure white
-// If you see ANY pixel flash a different colour while in this mode, the
-// problem is on the data wire (level mismatch, length, ground, EMI). The
-// software writes the same byte sequence every loop, so any transient is
-// signal corruption between RMT and the LEDs.
+// Diagnostic test pattern — 16 vertical rainbow bars that scroll
+// horizontally at 20 fps. Each bar is one solid hue; bars are 16 hue
+// units apart so the whole frame is high-contrast and any out-of-place
+// pixel is instantly obvious against its monochrome column. The pattern
+// animates predictably, so you can recognise both static glitches (a
+// pixel that doesn't match its column's hue) and timing glitches (a
+// bar tearing or a row offset).
 
 #include <cstdint>
 #include "effect.h"
@@ -21,26 +18,19 @@ class DiagEffect final : public Effect {
  public:
   const char *name() const override { return "Diagnostic"; }
 
-  void update(uint32_t /*now_ms*/, Matrix &m, const ClockState & /*s*/) override {
-    // Inner 14x14 hue gradient (high entropy → any bit flip stands out).
-    for (uint8_t y = 1; y < 15; y++) {
-      for (uint8_t x = 1; x < 15; x++) {
-        const uint8_t hue = static_cast<uint8_t>((x * 18 + y * 11) & 0xFF);
-        m.set_pixel(x, y, hsv_(hue, 255, 200));
+  void update(uint32_t now_ms, Matrix &m, const ClockState & /*s*/) override {
+    // Bars shift exactly one column every second — discrete steps, not
+    // a smooth scroll. Easier on the eyes for spotting transient glitches.
+    const uint8_t phase = static_cast<uint8_t>(now_ms / 1000);
+    for (uint8_t x = 0; x < Matrix::WIDTH; x++) {
+      // Bars are 16 hue units apart so the 16 columns span the full hue
+      // wheel (16*16 = 256 → wraps at the edge).
+      const uint8_t hue = static_cast<uint8_t>((x + phase) * 16);
+      const Color c = hsv_(hue, 255, 255);
+      for (uint8_t y = 0; y < Matrix::HEIGHT; y++) {
+        m.set_pixel(x, y, c);
       }
     }
-    // Cornice: cycle R/G/B repeating around the perimeter.
-    static const Color RING[3] = {
-        Color{255, 0, 0}, Color{0, 255, 0}, Color{0, 0, 255},
-    };
-    for (uint8_t i = 0; i < Matrix::CORNICE_LEN; i++) {
-      m.set_cornice(i, RING[i % 3]);
-    }
-    // Corner markers — always pure white. Easy reference points.
-    m.set_pixel(0, 0, Color{255, 255, 255});
-    m.set_pixel(15, 0, Color{255, 255, 255});
-    m.set_pixel(0, 15, Color{255, 255, 255});
-    m.set_pixel(15, 15, Color{255, 255, 255});
   }
 
  private:
