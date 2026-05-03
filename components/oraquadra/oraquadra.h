@@ -115,10 +115,23 @@ class OraquadraComponent : public Component {
   void paint_iaq_base_layer_();
   void paint_notification_(const Notification &n);
 
+  // Notification-layout helpers.
+  void paint_notif_alternating_(const Notification &n, uint32_t elapsed_ms);
+  void paint_notif_split_(const Notification &n, uint32_t elapsed_ms);
+  void paint_notif_icon_only_(const Notification &n);
+  void paint_icon_full_(const char *icon_name, Color c);
+  void paint_icon_8_(const char *icon_name, uint8_t x0, uint8_t y0, Color c);
+  void paint_scroll_text_full_(const char *text, Color c, uint32_t scroll_ms);
+  void paint_scroll_text_band_(const char *text, uint8_t y0, Color c, uint32_t scroll_ms);
+
   Effect *current_effect_();
   Color iaq_color_for_(float iaq) const;
   bool is_night_now_() const;
   uint8_t current_brightness_() const;
+
+  // Tracks when the currently-active notification became active, for
+  // alternating layout timing.
+  uint32_t active_notification_started_ms_{0};
 
   // ---- Wiring -------------------------------------------------------------
   // The YAML id references an AddressableLightState; we get the underlying

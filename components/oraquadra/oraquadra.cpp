@@ -1,4 +1,5 @@
 #include "oraquadra.h"
+#include <cstring>
 #include "icons.h"
 #include "fonts.h"
 #include "esphome/core/log.h"
@@ -111,6 +112,13 @@ void OraquadraComponent::render_() {
   // Layer 2: notification or active effect (mutually exclusive on the inner matrix).
   const Notification *notif = notifications_.tick(millis());
   if (notif != nullptr) {
+    // Track when this notification became "active" so layouts that animate
+    // over time (alternating, scroll text) know their elapsed_ms.
+    static const Notification *previous = nullptr;
+    if (notif != previous) {
+      active_notification_started_ms_ = millis();
+      previous = notif;
+    }
     paint_notification_(*notif);
   } else {
     Effect *effect = current_effect_();
@@ -133,21 +141,109 @@ void OraquadraComponent::paint_iaq_base_layer_() {
 }
 
 void OraquadraComponent::paint_notification_(const Notification &n) {
-  // Icon in the inner-left 8 columns (rows 4..11 = vertically centered).
-  const Icon *icon = find_icon(n.icon_name.c_str());
-  if (icon != nullptr) {
-    for (uint8_t row = 0; row < 16; row++) {
-      uint16_t bits = icon->bitmap[row];
-      for (uint8_t col = 0; col < 16; col++) {
-        if (bits & (0x8000 >> col)) {
-          matrix_->set_pixel(col, row, n.color);
+  const uint32_t elapsed = millis() - active_notification_started_ms_;
+  switch (n.layout) {
+    case NotificationLayout::ALTERNATING: paint_notif_alternating_(n, elapsed); break;
+    case NotificationLayout::SPLIT:       paint_notif_split_(n, elapsed); break;
+    case NotificationLayout::ICON_ONLY:   paint_notif_icon_only_(n); break;
+  }
+}
+
+// Full-matrix icon for first ICON_PHASE_MS, then full-matrix scroll text for
+// the remainder. Called every frame; we compute the right thing based on
+// elapsed time within the active notification.
+void OraquadraComponent::paint_notif_alternating_(const Notification &n, uint32_t elapsed_ms) {
+  constexpr uint32_t ICON_PHASE_MS = 2000;
+  if (elapsed_ms < ICON_PHASE_MS) {
+    paint_icon_full_(n.icon_name.c_str(), n.color);
+  } else if (n.text.empty()) {
+    // No text → keep showing icon for the whole duration.
+    paint_icon_full_(n.icon_name.c_str(), n.color);
+  } else {
+    paint_scroll_text_full_(n.text.c_str(), n.color, elapsed_ms - ICON_PHASE_MS);
+  }
+}
+
+// Icon top-left 8x8, scroll text in the bottom 8 rows (5x7 font centered
+// vertically in those rows).
+void OraquadraComponent::paint_notif_split_(const Notification &n, uint32_t elapsed_ms) {
+  paint_icon_8_(n.icon_name.c_str(), 0, 0, n.color);
+  if (!n.text.empty()) {
+    paint_scroll_text_band_(n.text.c_str(), 9, n.color, elapsed_ms);
+  }
+}
+
+void OraquadraComponent::paint_notif_icon_only_(const Notification &n) {
+  paint_icon_full_(n.icon_name.c_str(), n.color);
+}
+
+// Paint a 16x16 icon over the whole matrix.
+void OraquadraComponent::paint_icon_full_(const char *icon_name, Color c) {
+  const Icon *icon = find_icon(icon_name);
+  if (icon == nullptr) return;
+  for (uint8_t row = 0; row < 16; row++) {
+    uint16_t bits = icon->bitmap[row];
+    for (uint8_t col = 0; col < 16; col++) {
+      if (bits & (0x8000 >> col)) {
+        matrix_->set_pixel(col, row, c);
+      }
+    }
+  }
+}
+
+// Paint a 16x16 icon downsampled to 8x8 at top-left of the matrix.
+void OraquadraComponent::paint_icon_8_(const char *icon_name, uint8_t x0, uint8_t y0, Color c) {
+  const Icon *icon = find_icon(icon_name);
+  if (icon == nullptr) return;
+  // Downsample 2:1 — each 2x2 block of the 16x16 icon collapses to 1 pixel
+  // if any sub-pixel was set.
+  for (uint8_t row = 0; row < 8; row++) {
+    uint16_t r0 = icon->bitmap[row * 2];
+    uint16_t r1 = icon->bitmap[row * 2 + 1];
+    for (uint8_t col = 0; col < 8; col++) {
+      uint16_t mask_a = 0x8000 >> (col * 2);
+      uint16_t mask_b = 0x8000 >> (col * 2 + 1);
+      bool on = (r0 & (mask_a | mask_b)) || (r1 & (mask_a | mask_b));
+      if (on) matrix_->set_pixel(x0 + col, y0 + row, c);
+    }
+  }
+}
+
+// Scroll text horizontally across the whole matrix using the 5x7 font,
+// vertically centered (rows 4..10).
+void OraquadraComponent::paint_scroll_text_full_(const char *text, Color c, uint32_t scroll_ms) {
+  paint_scroll_text_band_(text, 4, c, scroll_ms);
+}
+
+// Scroll text in a horizontal band starting at row y0 (5x7 font fits in 7
+// rows). Position derived from scroll_ms / scroll_speed_ms.
+void OraquadraComponent::paint_scroll_text_band_(const char *text, uint8_t y0, Color c, uint32_t scroll_ms) {
+  const size_t len = std::strlen(text);
+  if (len == 0) return;
+  // Each char is 5 cols + 1 col gap = 6 cols. Total scroll width = 6*len + 16
+  // (16 cols of padding before/after for clean entry/exit).
+  const int16_t total_cols = static_cast<int16_t>(6 * len) + 16;
+  const uint16_t step_ms = (state_.scroll_speed_ms > 0) ? state_.scroll_speed_ms : 80;
+  // Pixel offset = how many cols we've scrolled in. text starts off-screen
+  // to the right and shifts left over time.
+  const int16_t offset = static_cast<int16_t>(scroll_ms / step_ms);
+  const int16_t pos = 16 - offset;  // x position of first char's first column
+
+  // Clip to matrix.
+  for (size_t i = 0; i < len; i++) {
+    const uint8_t *glyph = font5x7_glyph(text[i]);
+    int16_t glyph_x = pos + static_cast<int16_t>(i * 6);
+    for (uint8_t col = 0; col < FONT5x7_WIDTH; col++) {
+      int16_t x = glyph_x + col;
+      if (x < 0 || x >= (int16_t) Matrix::WIDTH) continue;
+      uint8_t bits = glyph[col];
+      for (uint8_t row = 0; row < FONT5x7_HEIGHT; row++) {
+        if (bits & (1 << row)) {
+          matrix_->set_pixel(static_cast<uint8_t>(x), y0 + row, c);
         }
       }
     }
   }
-  // Note: scroll-text rendering on the right half and timing animation are
-  // wired in the next pass (kept simple here; the queue + icon flash is
-  // already useful for HA-driven alerts).
 }
 
 Effect *OraquadraComponent::current_effect_() {

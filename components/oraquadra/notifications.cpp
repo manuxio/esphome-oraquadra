@@ -1,5 +1,6 @@
 #include "notifications.h"
 #include <algorithm>
+#include <cstring>
 #include "esphome/core/log.h"
 #include "esphome/components/json/json_util.h"
 
@@ -46,6 +47,17 @@ bool NotificationQueue::enqueue_from_json(const std::string &payload) {
     uint8_t pri = root["priority"] | 1;
     if (pri > 3) pri = 3;
     n.priority = static_cast<NotificationPriority>(pri);
+
+    if (root["layout"].is<const char *>()) {
+      const char *layout_str = root["layout"];
+      if (std::strcmp(layout_str, "split") == 0) {
+        n.layout = NotificationLayout::SPLIT;
+      } else if (std::strcmp(layout_str, "icon_only") == 0) {
+        n.layout = NotificationLayout::ICON_ONLY;
+      } else {
+        n.layout = NotificationLayout::ALTERNATING;  // default
+      }
+    }
     return true;
   });
 

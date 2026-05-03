@@ -37,12 +37,25 @@ enum class NotificationPriority : uint8_t {
   ALERT   = 3,
 };
 
+enum class NotificationLayout : uint8_t {
+  // Alternates over time: icon → text scroll → icon. The default — most
+  // visible because the icon catches attention then the message is read.
+  ALTERNATING = 0,
+  // Static side-by-side: 8x8 icon top-left + scroll text below. Compact and
+  // simultaneous. Less impactful but message visible alongside icon.
+  SPLIT       = 1,
+  // Icon centered in matrix; text is NOT rendered (caller can put it in the
+  // scroll_text entity instead). Lightest visual, useful for ambient alerts.
+  ICON_ONLY   = 2,
+};
+
 struct Notification {
   std::string text;
   std::string icon_name;
   Color color{255, 255, 255};
   uint16_t duration_ms{10000};
   NotificationPriority priority{NotificationPriority::INFO};
+  NotificationLayout layout{NotificationLayout::ALTERNATING};
   uint32_t enqueued_ms{0};
 };
 
