@@ -90,13 +90,15 @@ time:
           - lambda: id(oraquadra_component)->apply_brightness_for_now();
 
 # ============================================================================
-# I2C — kept on GPIO 0/1 per user decision; external 2.2-4.7k pull-ups required
+# I2C — moved off the GPIO 0 strapping pin (was causing IDF i2c bus-recovery
+# panic at boot). New pins: SDA=GPIO3, SCL=GPIO10. Both clean non-strapping
+# pins on the ESP32-C3.
 # ============================================================================
 i2c:
   - id: bus_a
-    sda: GPIO0
-    scl: GPIO1
-    frequency: 100kHz   # conservative, helps with strapping-pin reliability
+    sda: GPIO3
+    scl: GPIO10
+    frequency: 100kHz
 
 # ============================================================================
 # BME680 via Bosch BSEC2
