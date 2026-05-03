@@ -208,16 +208,19 @@ binary_sensor:
       - min_length: 50ms
         max_length: 800ms
         then:
-          - lambda: |-
-              if (id(api_id).is_connected()) {
-                ESP_LOGI("oraquadra", "btn short → firing HA event");
-                id(api_id).send_homeassistant_event(
-                    "esphome.oraquadra_button",
-                    {{"node_name", "${node_name}"}, {"press", "short"}});
-              } else {
-                ESP_LOGI("oraquadra", "btn short (HA offline) → cycling effect");
-                id(oraquadra_component)->cycle_mode();
-              }
+          - if:
+              condition:
+                api.connected:
+              then:
+                - homeassistant.event:
+                    event: esphome.oraquadra_button
+                    data:
+                      node_name: ${node_name}
+                      press: short
+              else:
+                - lambda: |-
+                    ESP_LOGI("oraquadra", "btn short (HA offline) → cycle effect");
+                    id(oraquadra_component)->cycle_mode();
       - min_length: 5000ms
         max_length: 30000ms
         then:
