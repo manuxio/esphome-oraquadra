@@ -7,6 +7,7 @@
 #include "effect.h"
 #include "fonts.h"
 #include <cstring>
+#include <string>
 
 namespace esphome {
 namespace oraquadra {
@@ -15,28 +16,27 @@ class ScrollEffect final : public Effect {
  public:
   const char *name() const override { return "Scroll"; }
 
-  // External setter so the component can swap text without going through the
-  // ClockState API. Called from set_scroll_text → updates len cached.
+  // Owns its own copy of the text so the pointer stays valid even if the
+  // caller's std::string is destroyed (the caller usually passes a temporary
+  // const-ref parameter).
   void set_text(const char *text) {
-    text_ = text;
-    len_ = (text != nullptr) ? std::strlen(text) : 0;
+    text_ = (text != nullptr) ? std::string(text) : std::string();
     start_ms_ = millis();
   }
 
   void update(uint32_t now_ms, Matrix &m, const ClockState &s) override {
-    if (text_ == nullptr || len_ == 0) {
+    if (text_.empty()) {
       // Nothing to show — render hint text so the user sees the mode is
       // selected but waiting for input.
       static const char *hint = "SET TEXT IN HA";
       render_(m, hint, std::strlen(hint), now_ms, s.color, s.scroll_speed_ms);
       return;
     }
-    render_(m, text_, len_, now_ms, s.color, s.scroll_speed_ms);
+    render_(m, text_.c_str(), text_.size(), now_ms, s.color, s.scroll_speed_ms);
   }
 
  private:
-  const char *text_{nullptr};
-  size_t len_{0};
+  std::string text_;
   uint32_t start_ms_{0};
 
   void render_(Matrix &m, const char *t, size_t n, uint32_t now_ms,

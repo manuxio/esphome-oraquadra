@@ -73,6 +73,11 @@ class NotificationQueue {
   // Currently-rendered notification, or nullptr if none.
   const Notification *active() const { return active_ ? &*active_ : nullptr; }
 
+  // millis() when the active notification started — needed by the renderer
+  // because `Notification *` addresses are reused across optional<>::emplace
+  // calls, so the renderer can't reliably detect "new notification" by ptr.
+  uint32_t active_started_ms() const { return active_started_ms_; }
+
   void clear();
   size_t pending_count() const { return queue_.size(); }
 

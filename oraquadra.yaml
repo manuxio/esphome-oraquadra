@@ -422,6 +422,23 @@ number:
       then:
         - lambda: id(oraquadra_component)->set_scroll_speed_ms((uint16_t)x);
 
+  # 0..100 % of current global brightness applied to the IAQ cornice ring.
+  # 0 = ring off, 100 = ring matches display brightness exactly.
+  # Lower values reduce flicker on long data lines (less peak current draw).
+  - platform: template
+    name: "${friendly_name} IAQ Brightness"
+    id: oraquadra_iaq_brightness
+    min_value: 0
+    max_value: 100
+    step: 5
+    initial_value: 30
+    unit_of_measurement: "%"
+    restore_value: true
+    optimistic: true
+    on_value:
+      then:
+        - lambda: id(oraquadra_component)->set_iaq_brightness_pct((uint8_t)x);
+
 # Quick "did it light up?" tester: press → effect=Solid, color=White → full matrix on.
 button:
   - platform: template

@@ -84,14 +84,20 @@ class OraquadraComponent : public Component {
   void set_mode(uint8_t mode);
   void cycle_mode() { set_mode((current_mode_ + 1) % NUM_MODES); }
   void set_color_preset(uint8_t idx);
-  // Convenience action: select Solid mode + White → full matrix on. Bound
-  // to a HA button entity for quick "did the hardware light up?" testing.
-  void all_on() { set_color_preset(0); set_mode(MODE_SOLID); }
+  // Smoke-test action: full white for 5 s, then auto-revert to whatever mode
+  // was active before. Wiring is in HA via a button entity.
+  void all_on();
   // Brightness setters are now safe to call any time — we don't touch the
   // LightState anymore (which used to crash during early restore). Brightness
   // is applied per-pixel at the end of every render via current_brightness_().
   void set_brightness_day(uint8_t b)   { brightness_day_ = b; }
   void set_brightness_night(uint8_t b) { brightness_night_ = b; }
+  // 0..100 % of current global brightness applied to IAQ-frame pixels only.
+  // Lets the user dim the cornice ring without dimming the whole display
+  // (and reduces continuous current draw from 60 saturated cornice LEDs).
+  void set_iaq_brightness_pct(uint8_t pct) {
+    iaq_brightness_pct_ = (pct > 100) ? 100 : pct;
+  }
   void set_scroll_speed_ms(uint16_t ms){ state_.scroll_speed_ms = ms; }
   void set_sleep_mode(bool on)         { sleep_mode_ = on; }
   void set_blink_seconds(bool on)      { state_.blink_seconds = on; }
@@ -124,6 +130,7 @@ class OraquadraComponent : public Component {
   void render_();
   void paint_iaq_base_layer_();
   void paint_notification_(const Notification &n);
+  void paint_seconds_hand_();
 
   // Notification-layout helpers.
   void paint_notif_alternating_(const Notification &n, uint32_t elapsed_ms);
@@ -180,9 +187,26 @@ class OraquadraComponent : public Component {
   bool iaq_frame_enabled_{true};
   float last_iaq_{0.0f};
   uint8_t last_iaq_accuracy_{0};
+  // 0..100 % of the current global brightness applied to cornice IAQ pixels.
+  // Defaults to 30: the ring is informative but doesn't dominate the display
+  // and keeps the cornice current draw down (less voltage dip on long data
+  // lines, which manifested as random pixel flicker on this hardware).
+  uint8_t iaq_brightness_pct_{30};
 
   // ---- Scrolling text -----------------------------------------------------
   std::string scroll_text_;
+
+  // ---- Smoke-test (all_on) ------------------------------------------------
+  // When the HA "All On" button is pressed we switch to MODE_SOLID + white
+  // for 5 s, then auto-restore the previous mode/color so the user doesn't
+  // get stuck looking at a fully-lit matrix.
+  uint32_t all_on_revert_at_ms_{0};
+  uint8_t  saved_mode_{MODE_FAST};
+  uint8_t  saved_color_idx_{0};
+
+  // Mode the user was on before they typed text into the scroll-text input
+  // (we auto-switch to MODE_SCROLL on non-empty text and revert on clear).
+  uint8_t  saved_mode_before_scroll_{MODE_FAST};
 
   // ---- Notifications ------------------------------------------------------
   NotificationQueue notifications_;

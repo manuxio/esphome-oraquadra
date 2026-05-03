@@ -21,14 +21,16 @@ static const Color COLOR_PRESETS[] = {
 static constexpr uint8_t NUM_COLOR_PRESETS = sizeof(COLOR_PRESETS) / sizeof(COLOR_PRESETS[0]);
 
 // IAQ → Color mapping for the cornice frame.
-// Bands match the BME680 BSEC2 documentation.
+// Bands match the BME680 BSEC2 documentation. Saturated full-range colors —
+// global brightness scaling is applied later in render_(), so picking dim
+// values here would compound and make the ring invisible at low brightness.
 Color OraquadraComponent::iaq_color_for_(float iaq) const {
-  if (iaq <  50.f) return Color{ 0, 32,  0};   // excellent — dim green
-  if (iaq < 100.f) return Color{20, 32,  0};   // good      — dim yellow-green
-  if (iaq < 150.f) return Color{40, 32,  0};   // moderate  — dim yellow
-  if (iaq < 200.f) return Color{48, 16,  0};   // poor      — dim orange
-  if (iaq < 300.f) return Color{48,  0,  0};   // bad       — dim red
-  return Color{32, 0, 32};                     // severe    — magenta (component pulses upstream)
+  if (iaq <  50.f) return Color{  0, 255,   0};   // excellent — green
+  if (iaq < 100.f) return Color{128, 255,   0};   // good      — yellow-green
+  if (iaq < 150.f) return Color{255, 255,   0};   // moderate  — yellow
+  if (iaq < 200.f) return Color{255, 128,   0};   // poor      — orange
+  if (iaq < 300.f) return Color{255,   0,   0};   // bad       — red
+  return Color{255, 0, 255};                      // severe    — magenta
 }
 
 void OraquadraComponent::setup() {
@@ -93,6 +95,15 @@ void OraquadraComponent::loop() {
   state_.minute = now.minute;
   state_.second = now.second;
 
+  // Auto-revert from all_on smoke test after the 5 s window.
+  if (all_on_revert_at_ms_ != 0 && millis() >= all_on_revert_at_ms_) {
+    all_on_revert_at_ms_ = 0;
+    color_preset_idx_ = saved_color_idx_;
+    state_.color = COLOR_PRESETS[color_preset_idx_];
+    set_mode(saved_mode_);
+    ESP_LOGI(TAG, "all_on auto-revert → mode %u color %u", saved_mode_, saved_color_idx_);
+  }
+
   render_();
 }
 
@@ -113,19 +124,25 @@ void OraquadraComponent::render_() {
   // Layer 2: notification or active effect (mutually exclusive on the inner matrix).
   const Notification *notif = notifications_.tick(millis());
   if (notif != nullptr) {
-    // Track when this notification became "active" so layouts that animate
-    // over time (alternating, scroll text) know their elapsed_ms.
-    static const Notification *previous = nullptr;
-    if (notif != previous) {
-      active_notification_started_ms_ = millis();
-      previous = notif;
-    }
+    // Time-since-start comes straight from the queue. We can't compare
+    // pointers to detect "new notification" because std::optional<>::emplace
+    // reuses the same storage address — back-to-back notifications return the
+    // same pointer, which would freeze elapsed_ms at the first one's start.
+    active_notification_started_ms_ = notifications_.active_started_ms();
     paint_notification_(*notif);
   } else {
     Effect *effect = current_effect_();
     if (effect != nullptr) {
       effect->update(millis(), *matrix_, state_);
     }
+  }
+
+  // Universal blink-seconds: a moving pixel on the cornice ring whose hue
+  // rotates each second. Painted on top of the active effect so it survives
+  // any clear()/fill() the effect did. Skipped during notifications (the
+  // notification owns the whole frame visually).
+  if (state_.blink_seconds && notif == nullptr) {
+    paint_seconds_hand_();
   }
 
   // Per-pixel brightness scaling. Acts as a global dimmer at the buffer
@@ -137,8 +154,41 @@ void OraquadraComponent::render_() {
   matrix_->show();
 }
 
+// HSV → RGB at full saturation/value. Used by the seconds-hand painter so
+// each second visually rotates around the color wheel.
+static Color hsv_full(uint8_t h) {
+  uint8_t region = h / 43;
+  uint8_t remainder = (h - region * 43) * 6;
+  uint8_t p = 0;
+  uint8_t q = (255 * (255 - remainder)) >> 8;
+  uint8_t t = (255 * remainder) >> 8;
+  switch (region) {
+    case 0: return Color{255, t, p};
+    case 1: return Color{q, 255, p};
+    case 2: return Color{p, 255, t};
+    case 3: return Color{p, q, 255};
+    case 4: return Color{t, p, 255};
+    default: return Color{255, p, q};
+  }
+}
+
+void OraquadraComponent::paint_seconds_hand_() {
+  // Map 0..59 → cornice index using the matrix helper, then paint a vivid
+  // hue that advances with each second (deg = sec * 6 → hue = sec * 25).
+  const uint8_t cornice_idx = Matrix::minute_to_cornice(state_.second);
+  matrix_->set_cornice(cornice_idx, hsv_full(state_.second * 25));
+}
+
 void OraquadraComponent::paint_iaq_base_layer_() {
   Color base = iaq_color_for_(last_iaq_);
+  // Pre-scale by iaq_brightness_pct_. Global brightness is applied later as
+  // a uniform multiplier on every pixel, so the effective IAQ brightness
+  // ends up = display_brightness × iaq_pct/100.
+  if (iaq_brightness_pct_ < 100) {
+    base.r = static_cast<uint8_t>((base.r * iaq_brightness_pct_) / 100);
+    base.g = static_cast<uint8_t>((base.g * iaq_brightness_pct_) / 100);
+    base.b = static_cast<uint8_t>((base.b * iaq_brightness_pct_) / 100);
+  }
   matrix_->paint_cornice_uniform(base);
 }
 
@@ -271,17 +321,38 @@ void OraquadraComponent::set_color_preset(uint8_t idx) {
   state_.color = COLOR_PRESETS[idx];
 }
 
+void OraquadraComponent::all_on() {
+  // Save current state if we're not already in an in-progress smoke test —
+  // pressing the button twice in a row should not clobber the originals.
+  if (all_on_revert_at_ms_ == 0) {
+    saved_mode_ = current_mode_;
+    saved_color_idx_ = color_preset_idx_;
+  }
+  set_color_preset(0);  // white
+  set_mode(MODE_SOLID);
+  all_on_revert_at_ms_ = millis() + 5000;
+  ESP_LOGI(TAG, "all_on: full white for 5 s, will revert to mode=%u color=%u",
+           saved_mode_, saved_color_idx_);
+}
+
 void OraquadraComponent::set_iaq(float iaq) {
   last_iaq_ = iaq;
 }
 
 void OraquadraComponent::set_scroll_text(const std::string &t) {
   scroll_text_ = t;
-  // Push the new text into the ScrollEffect so MODE_SCROLL renders it
-  // immediately. We cast because effects_[] holds Effect* and ScrollEffect's
-  // set_text is not on the base interface.
+  // Push the new text into the ScrollEffect (which owns its own copy now).
   if (effects_[MODE_SCROLL]) {
     static_cast<ScrollEffect *>(effects_[MODE_SCROLL].get())->set_text(t.c_str());
+  }
+  // Auto-switch to scroll mode when the user sets non-empty text — matches
+  // the obvious UX expectation. Setting empty text reverts to whatever mode
+  // they had before so an accidental clear doesn't lock them in scroll.
+  if (!t.empty() && current_mode_ != MODE_SCROLL) {
+    saved_mode_before_scroll_ = current_mode_;
+    set_mode(MODE_SCROLL);
+  } else if (t.empty() && current_mode_ == MODE_SCROLL) {
+    set_mode(saved_mode_before_scroll_);
   }
 }
 
