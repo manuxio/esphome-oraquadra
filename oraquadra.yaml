@@ -191,7 +191,12 @@ bme68x_bsec2_i2c:
   address: 0x76
   i2c_id: bus_a
   sample_rate: LP            # ~3 s, low power
-  state_save_interval: 6h    # NVS save cadence
+  # Persist BSEC calibration to NVS every 10 min so a reboot doesn't drop
+  # us back to accuracy=0 (re-calibrating to 3 takes 30 min – 4 h). NVS
+  # wear-levels writes over the partition; at 144 saves/day on a ~96-slot
+  # partition each physical sector sees ~600 writes/year, well under the
+  # 100k-cycle flash rating.
+  state_save_interval: 10min
 
 sensor:
   - platform: bme68x_bsec2
