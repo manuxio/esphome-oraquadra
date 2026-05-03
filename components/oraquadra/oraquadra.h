@@ -82,6 +82,9 @@ class OraquadraComponent : public Component {
   void set_mode(uint8_t mode);
   void cycle_mode() { set_mode((current_mode_ + 1) % NUM_MODES); }
   void set_color_preset(uint8_t idx);
+  // Convenience action: select Solid mode + White → full matrix on. Bound
+  // to a HA button entity for quick "did the hardware light up?" testing.
+  void all_on() { set_color_preset(0); set_mode(MODE_SOLID); }
   // Brightness setters are now safe to call any time — we don't touch the
   // LightState anymore (which used to crash during early restore). Brightness
   // is applied per-pixel at the end of every render via current_brightness_().

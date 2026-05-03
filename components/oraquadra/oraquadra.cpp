@@ -127,10 +127,8 @@ void OraquadraComponent::render_() {
     }
   }
 
-  // Apply global brightness (day/night/sleep) as a final pass so individual
-  // effects can declare colors at full saturation without each having to
-  // implement dimming themselves.
-  matrix_->apply_global_brightness(current_brightness_());
+  // [TEMP] Skip apply_global_brightness to test if it's the broken layer.
+  // matrix_->apply_global_brightness(current_brightness_());
 
   matrix_->show();
 }

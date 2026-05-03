@@ -343,6 +343,13 @@ number:
       then:
         - lambda: id(oraquadra_component)->set_scroll_speed_ms((uint16_t)x);
 
+# Quick "did it light up?" tester: press → effect=Solid, color=White → full matrix on.
+button:
+  - platform: template
+    name: "${friendly_name} All On"
+    on_press:
+      - lambda: id(oraquadra_component)->all_on();
+
 switch:
   - platform: template
     name: "${friendly_name} Sleep Mode"
