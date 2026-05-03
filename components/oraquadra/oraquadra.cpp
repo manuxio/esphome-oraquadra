@@ -186,7 +186,11 @@ bool OraquadraComponent::is_night_now_() const {
 }
 
 void OraquadraComponent::apply_brightness_for_now() {
-  if (light_state_ == nullptr) return;
+  // Defensive: LightState->set_immediately_ derefs output_ which may still
+  // be null if we're called before all setup completes (e.g. number entity
+  // restoring its value during ITS setup invokes our setter, which used to
+  // call this — see boot_done_ guard in the setters).
+  if (light_state_ == nullptr || light_output_ == nullptr || !boot_done_) return;
   uint8_t b = sleep_mode_ ? 0 : (is_night_now_() ? brightness_night_ : brightness_day_);
   auto call = light_state_->turn_on();
   call.set_brightness(b / 255.0f);
@@ -198,6 +202,8 @@ void OraquadraComponent::boot_completed() {
            language_ ? language_->name() : "(none)",
            static_cast<unsigned>(effects_.size()),
            static_cast<unsigned>(ICONS_COUNT));
+  // From here on it's safe to touch LightState — every component has setup'd.
+  boot_done_ = true;
   apply_brightness_for_now();
 }
 

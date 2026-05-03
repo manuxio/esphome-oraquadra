@@ -68,10 +68,17 @@ class OraquadraComponent : public Component {
   // ---- HA-driven config (called from YAML lambdas) ------------------------
   void set_mode(uint8_t mode);
   void set_color_preset(uint8_t idx);
-  void set_brightness_day(uint8_t b)   { brightness_day_ = b; apply_brightness_for_now(); }
-  void set_brightness_night(uint8_t b) { brightness_night_ = b; apply_brightness_for_now(); }
+  // NOTE on brightness setters: do NOT call apply_brightness_for_now() here.
+  // Number/switch entities with restore_value: true fire on_value during
+  // THEIR setup, and template entity setup runs before this component's
+  // setup() — light_state_->output_ is still null. apply_brightness_for_now
+  // would then call into LightState::set_immediately_ → null deref crash.
+  // Instead just store the value; on_boot (priority -100, after all setups)
+  // calls apply_brightness_for_now once we're safe.
+  void set_brightness_day(uint8_t b)   { brightness_day_ = b; if (boot_done_) apply_brightness_for_now(); }
+  void set_brightness_night(uint8_t b) { brightness_night_ = b; if (boot_done_) apply_brightness_for_now(); }
   void set_scroll_speed_ms(uint16_t ms){ state_.scroll_speed_ms = ms; }
-  void set_sleep_mode(bool on)         { sleep_mode_ = on; apply_brightness_for_now(); }
+  void set_sleep_mode(bool on)         { sleep_mode_ = on; if (boot_done_) apply_brightness_for_now(); }
   void set_blink_seconds(bool on)      { state_.blink_seconds = on; }
   void set_iaq_frame(bool on)          { iaq_frame_enabled_ = on; }
   void set_scroll_text(const std::string &t) { scroll_text_ = t; }
@@ -129,6 +136,11 @@ class OraquadraComponent : public Component {
   uint8_t brightness_day_{204};
   uint8_t brightness_night_{26};
   bool sleep_mode_{false};
+
+  // True after on_boot fires (priority -100, post-setup of every component).
+  // Until then, apply_brightness_for_now() is unsafe because LightState's
+  // output_ may not be wired yet.
+  bool boot_done_{false};
 
   // ---- IAQ frame ----------------------------------------------------------
   bool iaq_frame_enabled_{true};
