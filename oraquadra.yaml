@@ -14,6 +14,20 @@ esphome:
   platformio_options:
     build_cache_dir: /cache/pio_build_cache
   on_boot:
+    # HIGH priority (after light HW init at 800, before user code):
+    # turn light ON @ 100% brightness BLACK color. ESPHome's output stage
+    # scales pixels by LightState brightness (1.0 here = pass-through), but
+    # the buffer is all-black so no LED draws current. No boot-time current
+    # spike, no USB brown-out.
+    - priority: 700
+      then:
+        - light.turn_on:
+            id: matrix_strip
+            brightness: 100%
+            red: 0%
+            green: 0%
+            blue: 0%
+            transition_length: 0s
     - priority: -100
       then:
         - lambda: |-
@@ -186,13 +200,12 @@ light:
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
-    # ALWAYS_ON because ESPHome's output stage applies LightState brightness
-    # as a global multiplier on every pixel before transmit. If LightState is
-    # OFF (brightness=0), our component's pixel writes get multiplied to zero
-    # → matrix appears dark even though our buffer is correct. Forcing ON at
-    # 100% brightness makes our writes pass through unchanged. Per-pixel
-    # brightness is then handled by apply_global_brightness in our render.
-    restore_mode: ALWAYS_ON
+    # ALWAYS_OFF at boot, then turned ON @ BLACK by on_boot priority 700.
+    # This avoids the restore_mode auto-paint of all 256 LEDs at default
+    # color (white at full brightness) which would spike ~15 A and brown
+    # out USB. After the boot lambda settles things, brightness multiplier
+    # = 1.0 and our buffer values pass through unchanged.
+    restore_mode: ALWAYS_OFF
 
 # ============================================================================
 # Single button on GPIO 5 (custom PCB has only one).
@@ -362,10 +375,10 @@ switch:
     name: "${friendly_name} Sleep Mode"
     id: oraquadra_sleep_mode
     optimistic: true
-    # ALWAYS_OFF on every boot — sleep is a transient mode the user toggles
-    # at runtime, never desirable to silently restore at boot (was the cause
-    # of "matrix is dark after flash" troubleshooting).
-    restore_mode: ALWAYS_OFF
+    # Boot in sleep = display dark. User toggles OFF in HA when ready to
+    # power-on the LEDs (after hardware power-supply check). Avoids the
+    # current spike of all-active-effect at boot.
+    restore_mode: ALWAYS_ON
     turn_on_action:
       - lambda: id(oraquadra_component)->set_sleep_mode(true);
     turn_off_action:
