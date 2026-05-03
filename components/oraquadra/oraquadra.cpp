@@ -121,8 +121,20 @@ void OraquadraComponent::render_() {
     paint_iaq_base_layer_();
   }
 
-  // Layer 2: notification or active effect (mutually exclusive on the inner matrix).
   const Notification *notif = notifications_.tick(millis());
+
+  // Layer 2: blink-seconds pixel on the cornice. Painted BEFORE the effect
+  // because some time-words (e.g. VENTIDUE: LEDs 16, 47, 48, 79, …) live on
+  // cornice LEDs — if we painted the seconds-hand AFTER the effect, it would
+  // briefly flash one of the letter pixels with its rotating hue. Skipped
+  // during notifications (the notification owns the whole frame visually).
+  if (state_.blink_seconds && notif == nullptr) {
+    paint_seconds_hand_();
+  }
+
+  // Layer 3: notification or active effect (mutually exclusive on the inner
+  // matrix). Painted last so letters and icons always win over IAQ and the
+  // seconds-hand on shared cornice/letter LEDs.
   if (notif != nullptr) {
     // Time-since-start comes straight from the queue. We can't compare
     // pointers to detect "new notification" because std::optional<>::emplace
@@ -135,14 +147,6 @@ void OraquadraComponent::render_() {
     if (effect != nullptr) {
       effect->update(millis(), *matrix_, state_);
     }
-  }
-
-  // Universal blink-seconds: a moving pixel on the cornice ring whose hue
-  // rotates each second. Painted on top of the active effect so it survives
-  // any clear()/fill() the effect did. Skipped during notifications (the
-  // notification owns the whole frame visually).
-  if (state_.blink_seconds && notif == nullptr) {
-    paint_seconds_hand_();
   }
 
   // Per-pixel brightness scaling. Acts as a global dimmer at the buffer
