@@ -121,6 +121,11 @@ class OraquadraComponent : public Component {
   // ---- Triggers from YAML ------------------------------------------------
   void boot_completed();
   void on_minute_change();
+  // Called from the addressable_lambda hook on every strip update tick.
+  // Copies the shadow buffer into the strip's live buffer; this is the
+  // only time the strip buffer is touched, so it cannot race with the
+  // RMT transmission.
+  void flush_strip() { if (matrix_) matrix_->flush_to_strip(); }
   void apply_brightness_for_now();
   void on_btn_mode_short();
   void on_btn_mode_long();

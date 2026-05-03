@@ -18,50 +18,50 @@ const uint16_t Matrix::CORNICE[Matrix::CORNICE_LEN] = {
 };
 
 void Matrix::clear() {
-  if (strip_ == nullptr) return;
-  for (uint16_t i = 0; i < NUM_LEDS; i++)
-    (*strip_)[i] = Color::BLACK;
+  for (uint16_t i = 0; i < NUM_LEDS; i++) shadow_[i] = Color{0, 0, 0};
 }
 
 void Matrix::clear_inner() {
-  if (strip_ == nullptr) return;
   // The inner 14×14 starts at (1, 1) and ends at (14, 14).
   for (uint8_t y = 1; y < HEIGHT - 1; y++) {
     for (uint8_t x = 1; x < WIDTH - 1; x++) {
-      (*strip_)[xy_to_led(x, y)] = Color::BLACK;
+      shadow_[xy_to_led(x, y)] = Color{0, 0, 0};
     }
   }
 }
 
 void Matrix::fill(Color c) {
-  if (strip_ == nullptr) return;
-  for (uint16_t i = 0; i < NUM_LEDS; i++)
-    (*strip_)[i] = c;
+  for (uint16_t i = 0; i < NUM_LEDS; i++) shadow_[i] = c;
 }
 
 void Matrix::apply_global_brightness(uint8_t b) {
-  if (strip_ == nullptr) return;
-  // Scale every pixel by b/255 in-place. Cheap (256 px × 3 chans × 1 mul).
-  // We do this at the END of render so per-effect colors stay declarative
-  // and the brightness controls behave like a global dimmer.
+  // Scale every shadow pixel by b/255 in-place. Cheap (256 px × 3 chans).
   for (uint16_t i = 0; i < NUM_LEDS; i++) {
-    auto view = (*strip_)[i];
-    Color c = view.get();
+    Color &c = shadow_[i];
     c.r = static_cast<uint8_t>((c.r * b) >> 8);
     c.g = static_cast<uint8_t>((c.g * b) >> 8);
     c.b = static_cast<uint8_t>((c.b * b) >> 8);
-    view = c;
+  }
+}
+
+void Matrix::flush_to_strip() {
+  if (strip_ == nullptr) return;
+  // Copy the shadow into the strip's live buffer. Caller must invoke this
+  // synchronously with the strip's transmit cycle (i.e. from the
+  // addressable_lambda hook), never from our async render path.
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    (*strip_)[i] = shadow_[i];
   }
 }
 
 void Matrix::show() {
-  if (strip_ == nullptr) return;
-  strip_->schedule_show();
+  // Render path doesn't transmit anymore — flush happens from the lambda
+  // hook. Keeping the method as a no-op so call-sites compile unchanged.
 }
 
 void Matrix::set_pixel(uint16_t led, Color c) {
-  if (strip_ == nullptr || led >= NUM_LEDS) return;
-  (*strip_)[led] = c;
+  if (led >= NUM_LEDS) return;
+  shadow_[led] = c;
 }
 
 void Matrix::paint_word(const Word &w, Color c) {

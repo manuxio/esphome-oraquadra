@@ -3,16 +3,13 @@
 // =============================================================================
 // 16×16 LED matrix abstraction for OraQuadra.
 //
-// Wraps an ESPHome `AddressableLight` with:
-//   - serpentine xy↔led conversion (the matrix is wired in boustrophedon order)
-//   - word painting (multiple LEDs at once)
-//   - cornice (60-LED perimeter ring) helpers for the analog clock and the
-//     IAQ status frame
-//   - inner 14×14 region helpers (everything except the cornice)
+// Owns a SHADOW BUFFER (256 Color values) that all rendering writes into.
+// The strip's live RMT-transmitted buffer is updated via flush_to_strip(),
+// called by the addressable_lambda hook just before each transmission.
 //
-// The Matrix does NOT own the LED strip; it borrows the pointer set by the
-// component on setup(). All writes go straight into the strip's buffer; the
-// caller is responsible for committing via show().
+// The shadow design eliminates the write-during-transmit race that the
+// ESP-IDF RMT driver is sensitive to on ESP32-C3: our renderer never
+// touches the strip buffer while RMT is reading it.
 // =============================================================================
 
 #include <cstdint>
@@ -33,11 +30,15 @@ class Matrix {
   explicit Matrix(light::AddressableLight *strip) : strip_(strip) {}
 
   // ---- bulk operations -----------------------------------------------------
-  void clear();              // zero out every pixel
+  void clear();              // zero out every shadow pixel
   void clear_inner();        // zero out the inner 14×14 (cornice preserved)
-  void fill(Color c);        // every pixel = c
-  void apply_global_brightness(uint8_t b);  // scale every pixel by b/255
-  void show();               // commit buffer to the LED strip
+  void fill(Color c);        // every shadow pixel = c
+  void apply_global_brightness(uint8_t b);  // scale every shadow pixel by b/255
+  // Copies the shadow buffer into the strip's live buffer. Call this from
+  // the addressable_lambda hook so it runs synchronously with RMT
+  // transmission and never overlaps a write.
+  void flush_to_strip();
+  void show();               // legacy: alias for "schedule a strip refresh"
 
   // ---- pixel access --------------------------------------------------------
   void set_pixel(uint16_t led, Color c);
@@ -67,6 +68,10 @@ class Matrix {
 
  private:
   light::AddressableLight *strip_;
+
+  // Shadow buffer — all painting writes here; the strip is only touched
+  // during flush_to_strip(), which runs from the addressable_lambda hook.
+  Color shadow_[NUM_LEDS]{};
 
   // Static perimeter mapping: cornice_index → LED index. Generated to match
   // the V1.2.9 hardware orientation (start at top-left, go clockwise).

@@ -265,18 +265,17 @@ light:
     internal: true
     default_transition_length: 0s
     restore_mode: ALWAYS_ON
-    # Custom effect: a no-op addressable_lambda. When this effect is the
-    # ACTIVE one, ESPHome's AddressableLight::update_state early-returns
-    # without painting the buffer — leaves it to us. Our oraquadra component
-    # writes pixels every loop into the buffer; this effect just does
-    # nothing and prevents the LightState's solid-color renderer from
-    # stomping our work. Activated at boot via boot_completed().
+    # Custom effect: an addressable_lambda that flushes our shadow buffer
+    # to the strip just before each transmission. Painting from the lambda
+    # is synchronous with the LightState's write_state() call, so there
+    # is no race with our async render loop — the renderer only ever
+    # writes into the shadow buffer.
     effects:
       - addressable_lambda:
           name: "OraQuadra"
-          update_interval: 50ms
+          update_interval: 33ms
           lambda: |-
-            // intentionally empty — buffer is owned by oraquadra component
+            id(oraquadra_component)->flush_strip();
 
 # ============================================================================
 # Single button on GPIO 5 (custom PCB has only one).
