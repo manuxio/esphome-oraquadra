@@ -67,6 +67,19 @@ class Language {
   // rendering (Italian uses "E" at LED 116). Return -1 to disable the
   // heartbeat for languages that don't have a suitable LED.
   virtual int16_t heartbeat_led() const { return -1; }
+
+  // Phased rendering — used by FadeEffect and SlowEffect to reveal one
+  // grammatical chunk at a time. Phase order for Italian:
+  //   0 = PREFIX  ("SONO LE")
+  //   1 = HOUR    (numeric hour word)
+  //   2 = AND     ("E", connective; only if minute > 0)
+  //   3 = MINUTES (tens + units; only if minute > 0)
+  //   4 = SUFFIX  ("MINUTI"; only if minute > 0)
+  // Default impl renders nothing — base classes that don't support phased
+  // rendering can leave it untouched.
+  virtual void render_phase(Matrix &matrix, uint8_t hour, uint8_t minute,
+                            Color color, uint8_t phase) const {}
+  virtual uint8_t total_phases() const { return 5; }
 };
 
 }  // namespace oraquadra

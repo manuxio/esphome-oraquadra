@@ -171,6 +171,17 @@ class ItalianLanguage final : public Language {
     matrix.paint_word(it_words::SUFFIX, color);
   }
 
+  void render_phase(Matrix &matrix, uint8_t hour, uint8_t minute,
+                    Color color, uint8_t phase) const override {
+    switch (phase) {
+      case 0: matrix.paint_word(it_words::PREFIX, color); break;
+      case 1: matrix.paint_word(it_words::HOURS[hour], color); break;
+      case 2: if (minute > 0) matrix.paint_word(it_words::AND_WORD, color); break;
+      case 3: if (minute > 0) paint_minutes_(matrix, minute, color); break;
+      case 4: if (minute > 0) matrix.paint_word(it_words::SUFFIX, color); break;
+    }
+  }
+
  private:
   void paint_minutes_(Matrix &matrix, uint8_t minute, Color color) const {
     if (minute < 20) {
