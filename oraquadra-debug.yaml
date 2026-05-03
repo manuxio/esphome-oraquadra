@@ -28,7 +28,9 @@ esp32:
   board: esp32-c3-devkitm-1
   variant: esp32c3
   framework:
-    type: arduino
+    type: esp-idf
+    # ESP-IDF is the modern default. Smaller binary, more direct hardware
+    # control. BME680 BSEC2 may need a workaround on IDF (validated separately).
 
 logger:
   # Keep INFO to match main yaml — DEBUG would change ESPHOME_LOG_LEVEL macro
