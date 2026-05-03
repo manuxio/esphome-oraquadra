@@ -84,7 +84,7 @@ api:
     #     duration: 15
     #     priority: 3
     #     layout: "alternating"
-    - service:notify
+    - service: notify
       variables:
         text: string
         icon: string
@@ -97,7 +97,7 @@ api:
 
     # Quick "scroll a banner" — sets the scroll text and switches to MODE_SCROLL.
     # Useful for one-shot messages without notification queue overhead.
-    - service:scroll_banner
+    - service: scroll_banner
       variables:
         text: string
       then:
@@ -106,7 +106,7 @@ api:
             id(oraquadra_component)->set_mode(14);  // MODE_SCROLL
 
     # Common-case shortcut: warn icon + red color + alert priority
-    - service:notify_warning
+    - service: notify_warning
       variables:
         text: string
       then:
@@ -114,7 +114,7 @@ api:
             id(oraquadra_component)->notify(text, "warning", "#ff0000", 15, 3, "alternating");
 
     # Common-case shortcut: info icon + user color + info priority
-    - service:notify_info
+    - service: notify_info
       variables:
         text: string
       then:
