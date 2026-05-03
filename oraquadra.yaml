@@ -1,0 +1,390 @@
+substitutions:
+  node_name: oraquadra
+  friendly_name: "OraQuadra"
+  # Per device-specific overrides, copy this file and change the substitutions above.
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${friendly_name}
+  comment: "Italian word clock + BME680 + HA-driven effects"
+  min_version: "2024.6.0"
+  # PlatformIO content-hash build cache. Combined with the Docker /cache mount
+  # in build.ps1, unchanged .cpp files are not re-compiled — second build of
+  # the same code drops from ~5 min to ~30 s.
+  platformio_options:
+    build_cache_dir: /cache/pio_build_cache
+  on_boot:
+    - priority: -100
+      then:
+        - lambda: |-
+            id(oraquadra_component)->boot_completed();
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: arduino   # required by bme68x_bsec2 library
+
+logger:
+  level: INFO
+  # UART0 (TX=GPIO21, RX=GPIO20 on C3) is free — keep logger active for
+  # diagnostics. GPIO 1 stays as I2C SCL (no conflict).
+  baud_rate: 115200
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+
+captive_portal:
+
+# Lets ESPHome Web (and the HA "Add device" flow) push WiFi credentials over
+# the serial port right after flashing — no need to join the AP manually.
+improv_serial:
+
+time:
+  # SNTP keeps the clock running even when HA is offline. Timezone is set
+  # locally (DST handled by the IANA tz database baked into ESPHome).
+  - platform: sntp
+    id: ha_time
+    timezone: Europe/Rome
+    servers:
+      - pool.ntp.org
+      - time.cloudflare.com
+      - time.google.com
+    on_time:
+      # Cycle effects every minute (mirrors the original .ino behavior)
+      - seconds: 0
+        minutes: '*'
+        then:
+          - lambda: id(oraquadra_component)->on_minute_change();
+      # Day brightness
+      - seconds: 0
+        minutes: 0
+        hours: 7
+        then:
+          - lambda: id(oraquadra_component)->apply_brightness_for_now();
+      # Night brightness
+      - seconds: 0
+        minutes: 0
+        hours: 22
+        then:
+          - lambda: id(oraquadra_component)->apply_brightness_for_now();
+      # Sleep mode
+      - seconds: 0
+        minutes: 0
+        hours: 23
+        then:
+          - lambda: id(oraquadra_component)->apply_brightness_for_now();
+
+# ============================================================================
+# I2C — kept on GPIO 0/1 per user decision; external 2.2-4.7k pull-ups required
+# ============================================================================
+i2c:
+  - id: bus_a
+    sda: GPIO0
+    scl: GPIO1
+    frequency: 100kHz   # conservative, helps with strapping-pin reliability
+
+# ============================================================================
+# BME680 via Bosch BSEC2
+# ============================================================================
+bme68x_bsec2_i2c:
+  model: bme680
+  address: 0x76
+  i2c_id: bus_a
+  sample_rate: LP            # ~3 s, low power
+  state_save_interval: 6h    # NVS save cadence
+
+sensor:
+  - platform: bme68x_bsec2
+    temperature:
+      name: "${friendly_name} Temperature"
+    pressure:
+      name: "${friendly_name} Pressure"
+    humidity:
+      name: "${friendly_name} Humidity"
+    iaq:
+      name: "${friendly_name} IAQ"
+      id: env_iaq
+      on_value:
+        then:
+          - lambda: id(oraquadra_component)->set_iaq(x, id(env_iaq_accuracy).state);
+    iaq_accuracy:
+      name: "${friendly_name} IAQ Accuracy"
+      id: env_iaq_accuracy
+    co2_equivalent:
+      name: "${friendly_name} CO2 eq"
+    breath_voc_equivalent:
+      name: "${friendly_name} VOC eq"
+
+  - platform: wifi_signal
+    name: "${friendly_name} RSSI"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+
+  - platform: internal_temperature
+    name: "${friendly_name} ESP Temperature"
+
+  - platform: template
+    name: "${friendly_name} Free Heap"
+    lambda: |-
+      return ESP.getFreeHeap() / 1024.0;
+    unit_of_measurement: "kB"
+    update_interval: 30s
+    entity_category: diagnostic
+
+# ============================================================================
+# LED strip — internal: not exposed to HA; component drives it directly
+# ============================================================================
+light:
+  - platform: esp32_rmt_led_strip
+    id: matrix_strip
+    rgb_order: GRB
+    pin: GPIO4
+    num_leds: 256
+    chipset: WS2812
+    name: "${friendly_name} Matrix"
+    internal: true
+    default_transition_length: 0s
+
+# ============================================================================
+# Buttons — NA-to-GND, internal pull-up
+# ============================================================================
+binary_sensor:
+  - platform: gpio
+    id: btn_mode
+    pin:
+      number: GPIO6
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "${friendly_name} Mode Button"
+    internal: true
+    on_click:
+      - min_length: 50ms
+        max_length: 800ms
+        then:
+          - lambda: id(oraquadra_component)->on_btn_mode_short();
+      - min_length: 800ms
+        max_length: 5000ms
+        then:
+          - lambda: id(oraquadra_component)->on_btn_mode_long();
+
+  - platform: gpio
+    id: btn_sec
+    pin:
+      number: GPIO7
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "${friendly_name} Color Button"
+    internal: true
+    on_click:
+      - min_length: 50ms
+        max_length: 800ms
+        then:
+          - lambda: id(oraquadra_component)->on_btn_sec_short();
+      - min_length: 800ms
+        max_length: 5000ms
+        then:
+          - lambda: id(oraquadra_component)->on_btn_sec_long();
+
+# Both held >= 5 s = WiFi reset
+interval:
+  - interval: 200ms
+    then:
+      - lambda: |-
+          static uint32_t both_pressed_since = 0;
+          if (id(btn_mode).state && id(btn_sec).state) {
+            if (both_pressed_since == 0) both_pressed_since = millis();
+            else if (millis() - both_pressed_since >= 5000) {
+              ESP_LOGW("oraquadra", "Both buttons held — clearing WiFi & rebooting");
+              wifi::global_wifi_component->clear_sta();
+              App.safe_reboot();
+            }
+          } else {
+            both_pressed_since = 0;
+          }
+
+# ============================================================================
+# External component
+# ============================================================================
+external_components:
+  - source:
+      type: local
+      path: components
+
+oraquadra:
+  id: oraquadra_component
+  light_id: matrix_strip
+  time_id: ha_time
+  iaq_sensor_id: env_iaq
+  iaq_accuracy_sensor_id: env_iaq_accuracy
+
+# ============================================================================
+# HA-facing entities (Phase 8)
+# ============================================================================
+select:
+  - platform: template
+    name: "${friendly_name} Effect"
+    id: oraquadra_effect
+    options:
+      - "Fade"
+      - "Slow"
+      - "Fast"
+      - "Matrix"
+      - "Matrix2"
+      - "Tron"
+      - "Moto"
+      - "Galaga"
+      - "Pacman"
+      - "Digitale"
+      - "Drop"
+      - "Rainbow"
+      - "Analog"
+    initial_option: "Fast"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            // Map name → mode index (matches MODE_* in oraquadra.h)
+            const char *opts[] = {"Fade","Slow","Fast","Matrix","Matrix2","Tron",
+                                  "Moto","Galaga","Pacman","Digitale","Drop",
+                                  "Rainbow","Analog"};
+            for (uint8_t i = 0; i < 13; i++) {
+              if (x == opts[i]) {
+                id(oraquadra_component)->set_mode(i);
+                return;
+              }
+            }
+
+  - platform: template
+    name: "${friendly_name} Color Preset"
+    id: oraquadra_color_preset
+    options: ["White","Blue","Red","Green","Yellow","Orange"]
+    initial_option: "White"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            const char *opts[] = {"White","Blue","Red","Green","Yellow","Orange"};
+            for (uint8_t i = 0; i < 6; i++) {
+              if (x == opts[i]) {
+                id(oraquadra_component)->set_color_preset(i);
+                return;
+              }
+            }
+
+number:
+  - platform: template
+    name: "${friendly_name} Brightness Day"
+    id: oraquadra_brightness_day
+    min_value: 0
+    max_value: 255
+    step: 1
+    initial_value: 204
+    restore_value: true
+    optimistic: true
+    on_value:
+      then:
+        - lambda: id(oraquadra_component)->set_brightness_day((uint8_t)x);
+
+  - platform: template
+    name: "${friendly_name} Brightness Night"
+    id: oraquadra_brightness_night
+    min_value: 0
+    max_value: 255
+    step: 1
+    initial_value: 26
+    restore_value: true
+    optimistic: true
+    on_value:
+      then:
+        - lambda: id(oraquadra_component)->set_brightness_night((uint8_t)x);
+
+  - platform: template
+    name: "${friendly_name} Scroll Speed"
+    id: oraquadra_scroll_speed
+    min_value: 10
+    max_value: 500
+    step: 5
+    initial_value: 50
+    unit_of_measurement: "ms"
+    restore_value: true
+    optimistic: true
+    on_value:
+      then:
+        - lambda: id(oraquadra_component)->set_scroll_speed_ms((uint16_t)x);
+
+switch:
+  - platform: template
+    name: "${friendly_name} Sleep Mode"
+    id: oraquadra_sleep_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(oraquadra_component)->set_sleep_mode(true);
+    turn_off_action:
+      - lambda: id(oraquadra_component)->set_sleep_mode(false);
+
+  - platform: template
+    name: "${friendly_name} Blink Seconds"
+    id: oraquadra_blink_seconds
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: id(oraquadra_component)->set_blink_seconds(true);
+    turn_off_action:
+      - lambda: id(oraquadra_component)->set_blink_seconds(false);
+
+  - platform: template
+    name: "${friendly_name} IAQ Frame"
+    id: oraquadra_iaq_frame
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: id(oraquadra_component)->set_iaq_frame(true);
+    turn_off_action:
+      - lambda: id(oraquadra_component)->set_iaq_frame(false);
+
+text:
+  - platform: template
+    name: "${friendly_name} Scroll Text"
+    id: oraquadra_scroll_text
+    mode: text
+    min_length: 0
+    max_length: 200
+    optimistic: true
+    restore_value: true
+    initial_value: ""
+    on_value:
+      then:
+        - lambda: id(oraquadra_component)->set_scroll_text(x);
+
+  - platform: template
+    name: "${friendly_name} Notification In"
+    id: oraquadra_notification_in
+    mode: text
+    min_length: 0
+    max_length: 255
+    optimistic: true
+    initial_value: ""
+    on_value:
+      then:
+        - lambda: id(oraquadra_component)->push_notification_json(x);

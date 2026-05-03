@@ -1,0 +1,130 @@
+# OraQuadra DEBUG / minimal YAML
+#
+# Purpose: bisect what's causing the boot loop in the main firmware.
+# This config strips out everything custom (oraquadra component, BME680,
+# notifications, all HA entities) and keeps only the bare ESPHome baseline
+# so we can establish whether the platform itself works on this hardware.
+#
+# If THIS boots cleanly:
+#   → re-enable BME680 alone → if breaks, it's BSEC2
+#   → re-enable our oraquadra component alone → if breaks, it's our code
+#
+# If even THIS doesn't boot, the problem is platform-level (LED strip,
+# improv, time component, etc).
+
+substitutions:
+  node_name: oraquadra
+  friendly_name: "OraQuadra"
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${friendly_name}
+  comment: "DEBUG minimal — boot loop diagnostic"
+  min_version: "2024.6.0"
+  platformio_options:
+    build_cache_dir: /cache/pio_build_cache
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: arduino
+
+logger:
+  # Keep INFO to match main yaml — DEBUG would change ESPHOME_LOG_LEVEL macro
+  # and bust the build_cache_dir for every file including log.h.
+  level: INFO
+  baud_rate: 115200
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+
+captive_portal:
+
+improv_serial:
+
+# Quick browser-based status page on port 80. Out-of-scope for production
+# (HA is the canonical UI), but useful while we're bisecting.
+web_server:
+  port: 80
+  version: 3
+  log: false
+
+time:
+  - platform: sntp
+    id: ha_time
+    timezone: Europe/Rome
+    servers:
+      - pool.ntp.org
+
+# LED strip — ensure all LEDs are forced OFF at boot to rule out
+# brownout-from-random-power-up.
+light:
+  - platform: esp32_rmt_led_strip
+    id: matrix_strip
+    rgb_order: GRB
+    pin: GPIO4
+    num_leds: 256
+    chipset: WS2812
+    name: "${friendly_name} Matrix"
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+
+# Bare GPIO sensors, no on_click handlers (which referenced oraquadra_component)
+binary_sensor:
+  - platform: gpio
+    id: btn_mode
+    pin:
+      number: GPIO6
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "${friendly_name} Mode Button"
+
+  - platform: gpio
+    id: btn_sec
+    pin:
+      number: GPIO7
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "${friendly_name} Color Button"
+
+# Diagnostic only — no BME680, no Free Heap (no template lambda)
+sensor:
+  - platform: wifi_signal
+    name: "${friendly_name} RSSI"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+
+  - platform: internal_temperature
+    name: "${friendly_name} ESP Temperature"
+
+# =============================================================================
+# BISECTION STEP 1: re-enable our custom component, NO BME680, NO HA entities,
+# NO on_boot/interval lambda. If this crashes → bug is in our C++ code.
+# =============================================================================
+external_components:
+  - source:
+      type: local
+      path: components
+
+oraquadra:
+  id: oraquadra_component
+  light_id: matrix_strip
+  time_id: ha_time
