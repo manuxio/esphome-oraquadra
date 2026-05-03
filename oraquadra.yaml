@@ -186,6 +186,13 @@ light:
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
+    # ALWAYS_ON because ESPHome's output stage applies LightState brightness
+    # as a global multiplier on every pixel before transmit. If LightState is
+    # OFF (brightness=0), our component's pixel writes get multiplied to zero
+    # → matrix appears dark even though our buffer is correct. Forcing ON at
+    # 100% brightness makes our writes pass through unchanged. Per-pixel
+    # brightness is then handled by apply_global_brightness in our render.
+    restore_mode: ALWAYS_ON
 
 # ============================================================================
 # Single button on GPIO 5 (custom PCB has only one).

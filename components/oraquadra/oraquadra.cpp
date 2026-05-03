@@ -127,8 +127,11 @@ void OraquadraComponent::render_() {
     }
   }
 
-  // [TEMP] Skip apply_global_brightness to test if it's the broken layer.
-  // matrix_->apply_global_brightness(current_brightness_());
+  // Per-pixel brightness scaling. Acts as a global dimmer at the buffer
+  // level, downstream of every effect. With LightState pinned at full
+  // brightness in boot_completed(), this is the SOLE place brightness is
+  // applied — predictable.
+  matrix_->apply_global_brightness(current_brightness_());
 
   matrix_->show();
 }
@@ -301,9 +304,19 @@ void OraquadraComponent::boot_completed() {
            language_ ? language_->name() : "(none)",
            static_cast<unsigned>(effects_.size()),
            static_cast<unsigned>(ICONS_COUNT));
-  // From here on it's safe to touch LightState — every component has setup'd.
+  // Force the LightState to ON at full brightness ONCE. ESPHome's output
+  // pipeline scales every transmitted pixel by LightState's brightness; if
+  // we leave it OFF, all our writes are multiplied to zero. By pinning it to
+  // ON @ 1.0 here, our buffer values pass through unchanged. Real brightness
+  // is then applied per-pixel in apply_global_brightness().
+  if (light_state_ != nullptr) {
+    auto call = light_state_->turn_on();
+    call.set_brightness(1.0f);
+    call.set_rgb(1.0f, 1.0f, 1.0f);
+    call.set_transition_length(0);
+    call.perform();
+  }
   boot_done_ = true;
-  apply_brightness_for_now();
 }
 
 // Button handlers — mirror the original .ino's button UX:
