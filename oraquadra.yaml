@@ -121,10 +121,13 @@ sensor:
       id: env_iaq
       on_value:
         then:
-          - lambda: id(oraquadra_component)->set_iaq(x, id(env_iaq_accuracy).state);
+          - lambda: id(oraquadra_component)->set_iaq(x);
     iaq_accuracy:
       name: "${friendly_name} IAQ Accuracy"
       id: env_iaq_accuracy
+      on_value:
+        then:
+          - lambda: id(oraquadra_component)->set_iaq_accuracy(x);
     co2_equivalent:
       name: "${friendly_name} CO2 eq"
     breath_voc_equivalent:

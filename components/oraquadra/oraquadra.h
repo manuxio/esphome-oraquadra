@@ -75,7 +75,11 @@ class OraquadraComponent : public Component {
   void set_blink_seconds(bool on)      { state_.blink_seconds = on; }
   void set_iaq_frame(bool on)          { iaq_frame_enabled_ = on; }
   void set_scroll_text(const std::string &t) { scroll_text_ = t; }
-  void set_iaq(float iaq, float accuracy);
+  // Two separate setters so the YAML doesn't need a cross-sensor reference
+  // (which would create a circular codegen dependency inside the BME680
+  // sensor block).
+  void set_iaq(float iaq);
+  void set_iaq_accuracy(float accuracy);
 
   void push_notification_json(const std::string &json) { notifications_.enqueue_from_json(json); }
 

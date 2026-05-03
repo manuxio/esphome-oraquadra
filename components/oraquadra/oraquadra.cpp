@@ -151,8 +151,11 @@ void OraquadraComponent::set_color_preset(uint8_t idx) {
   state_.color = COLOR_PRESETS[idx];
 }
 
-void OraquadraComponent::set_iaq(float iaq, float accuracy) {
+void OraquadraComponent::set_iaq(float iaq) {
   last_iaq_ = iaq;
+}
+
+void OraquadraComponent::set_iaq_accuracy(float accuracy) {
   last_iaq_accuracy_ = static_cast<uint8_t>(accuracy);
 }
 
