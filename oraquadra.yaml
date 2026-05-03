@@ -23,7 +23,10 @@ esp32:
   board: esp32-c3-devkitm-1
   variant: esp32c3
   framework:
-    type: arduino   # required by bme68x_bsec2 library
+    type: esp-idf
+    # ESP-IDF: smaller binary, faster builds, better RTOS scheduling.
+    # If/when bme68x_bsec2 is re-enabled, may need a workaround if the
+    # ESPHome integration is still Arduino-only on this version.
 
 logger:
   level: INFO
@@ -140,7 +143,9 @@ sensor:
   - platform: template
     name: "${friendly_name} Free Heap"
     lambda: |-
-      return ESP.getFreeHeap() / 1024.0;
+      // ESP.getFreeHeap() is Arduino-only. esp_get_free_heap_size() is the
+      // ESP-IDF equivalent (also works under arduino-as-component).
+      return esp_get_free_heap_size() / 1024.0;
     unit_of_measurement: "kB"
     update_interval: 30s
     entity_category: diagnostic
