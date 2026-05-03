@@ -34,6 +34,13 @@ logger:
   # diagnostics. GPIO 1 stays as I2C SCL (no conflict).
   # On ESP32-C3 native USB, log goes to BOTH UART and USB-Serial/JTAG (COM port).
   baud_rate: 115200
+  logs:
+    # Trace I2C traffic + BME680 BSEC2 to investigate why sensor values
+    # don't change when breathing on the sensor.
+    i2c: VERY_VERBOSE
+    i2c.idf: VERY_VERBOSE
+    bme68x_bsec2: VERY_VERBOSE
+    bme68x_bsec2.sensor: VERY_VERBOSE
 
 api:
   encryption:
