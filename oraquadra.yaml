@@ -29,18 +29,27 @@ esp32:
     # ESPHome integration is still Arduino-only on this version.
 
 logger:
-  level: DEBUG
-  # UART0 (TX=GPIO21, RX=GPIO20 on C3) is free — keep logger active for
-  # diagnostics. GPIO 1 stays as I2C SCL (no conflict).
-  # On ESP32-C3 native USB, log goes to BOTH UART and USB-Serial/JTAG (COM port).
+  # Global ceiling = VERBOSE so we can see I2C transactions and BME680
+  # internal state. Per-component log level can only be EQUAL OR LESS verbose
+  # than this, so we downgrade the chatty stuff below to keep the COM port
+  # readable.
+  level: VERBOSE
   baud_rate: 115200
   logs:
-    # Trace I2C traffic + BME680 BSEC2 to investigate why sensor values
-    # don't change when breathing on the sensor.
-    i2c: VERY_VERBOSE
-    i2c.idf: VERY_VERBOSE
-    bme68x_bsec2: VERY_VERBOSE
-    bme68x_bsec2.sensor: VERY_VERBOSE
+    # Tame the noisy ones — leave i2c and bme68x_bsec2 at default (VERBOSE)
+    wifi: INFO
+    wifi_esp32: INFO
+    api: INFO
+    api.connection: INFO
+    mdns: INFO
+    captive_portal: INFO
+    web_server: INFO
+    web_server_idf: INFO
+    json: INFO
+    light: INFO
+    template.text: INFO
+    safe_mode: INFO
+    component: DEBUG
 
 api:
   encryption:
