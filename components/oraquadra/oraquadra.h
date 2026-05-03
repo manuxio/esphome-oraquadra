@@ -43,6 +43,7 @@
 #include "pacman_effect.h"
 #include "digital_effect.h"
 #include "scroll_effect.h"
+#include "diag_effect.h"
 
 namespace esphome {
 namespace oraquadra {
@@ -63,6 +64,7 @@ enum Mode : uint8_t {
   MODE_ANALOG   = 12,
   MODE_SOLID    = 13,   // fill matrix with current color (HA "all on" use case)
   MODE_SCROLL   = 14,   // scroll the user-configured text continuously
+  MODE_DIAG     = 15,   // static test pattern for data-line debugging
   NUM_MODES
 };
 

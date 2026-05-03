@@ -253,6 +253,10 @@ light:
     pin: GPIO4
     num_leds: 256
     chipset: WS2812
+    # Larger symbol buffer reduces the chance of RMT underruns when the
+    # CPU is busy with WiFi / BSEC2 / our render loop — a likely cause of
+    # occasional random pixel flicker on long strips.
+    rmt_symbols: 384
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
@@ -351,6 +355,7 @@ select:
       - "Analog"
       - "Solid"
       - "Scroll"
+      - "Diagnostic"
     initial_option: "Fast"
     optimistic: true
     restore_value: true
@@ -360,8 +365,8 @@ select:
             // Map name → mode index (matches MODE_* in oraquadra.h)
             const char *opts[] = {"Fade","Slow","Fast","Matrix","Matrix2","Tron",
                                   "Moto","Galaga","Pacman","Digitale","Drop",
-                                  "Rainbow","Analog","Solid","Scroll"};
-            for (uint8_t i = 0; i < 15; i++) {
+                                  "Rainbow","Analog","Solid","Scroll","Diagnostic"};
+            for (uint8_t i = 0; i < 16; i++) {
               if (x == opts[i]) {
                 id(oraquadra_component)->set_mode(i);
                 return;

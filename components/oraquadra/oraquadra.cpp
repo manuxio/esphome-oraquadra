@@ -80,6 +80,7 @@ void OraquadraComponent::setup() {
   effects_[MODE_ANALOG]  = std::make_unique<AnalogEffect>();
   effects_[MODE_SOLID]   = std::make_unique<SolidEffect>();
   effects_[MODE_SCROLL]  = std::make_unique<ScrollEffect>();
+  effects_[MODE_DIAG]    = std::make_unique<DiagEffect>();
 
   state_.language = language_.get();
   state_.color    = COLOR_PRESETS[color_preset_idx_];
