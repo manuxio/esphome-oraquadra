@@ -52,6 +52,7 @@ logger:
     component: DEBUG
 
 api:
+  id: api_id
   encryption:
     key: !secret api_key
 
@@ -187,65 +188,43 @@ light:
     default_transition_length: 0s
 
 # ============================================================================
-# Buttons — NA-to-GND, internal pull-up
+# Single button on GPIO 5 (custom PCB has only one).
+# Short press: if connected to HA → fire event 'esphome.oraquadra_button',
+#              else → cycle effect locally as offline fallback.
+# Long press (5 s): clear WiFi credentials and reboot into AP setup.
 # ============================================================================
 binary_sensor:
   - platform: gpio
-    id: btn_mode
+    id: btn
     pin:
-      number: GPIO6
+      number: GPIO5
       mode:
         input: true
         pullup: true
       inverted: true
-    name: "${friendly_name} Mode Button"
+    name: "${friendly_name} Button"
     internal: true
     on_click:
       - min_length: 50ms
         max_length: 800ms
         then:
-          - lambda: id(oraquadra_component)->on_btn_mode_short();
-      - min_length: 800ms
-        max_length: 5000ms
+          - lambda: |-
+              if (id(api_id).is_connected()) {
+                ESP_LOGI("oraquadra", "btn short → firing HA event");
+                id(api_id).send_homeassistant_event(
+                    "esphome.oraquadra_button",
+                    {{"node_name", "${node_name}"}, {"press", "short"}});
+              } else {
+                ESP_LOGI("oraquadra", "btn short (HA offline) → cycling effect");
+                id(oraquadra_component)->cycle_mode();
+              }
+      - min_length: 5000ms
+        max_length: 30000ms
         then:
-          - lambda: id(oraquadra_component)->on_btn_mode_long();
-
-  - platform: gpio
-    id: btn_sec
-    pin:
-      number: GPIO7
-      mode:
-        input: true
-        pullup: true
-      inverted: true
-    name: "${friendly_name} Color Button"
-    internal: true
-    on_click:
-      - min_length: 50ms
-        max_length: 800ms
-        then:
-          - lambda: id(oraquadra_component)->on_btn_sec_short();
-      - min_length: 800ms
-        max_length: 5000ms
-        then:
-          - lambda: id(oraquadra_component)->on_btn_sec_long();
-
-# Both held >= 5 s = WiFi reset
-interval:
-  - interval: 200ms
-    then:
-      - lambda: |-
-          static uint32_t both_pressed_since = 0;
-          if (id(btn_mode).state && id(btn_sec).state) {
-            if (both_pressed_since == 0) both_pressed_since = millis();
-            else if (millis() - both_pressed_since >= 5000) {
-              ESP_LOGW("oraquadra", "Both buttons held — clearing WiFi & rebooting");
+          - lambda: |-
+              ESP_LOGW("oraquadra", "btn long-held — clearing WiFi & rebooting");
               wifi::global_wifi_component->clear_sta();
               App.safe_reboot();
-            }
-          } else {
-            both_pressed_since = 0;
-          }
 
 # ============================================================================
 # External component
@@ -284,6 +263,7 @@ select:
       - "Drop"
       - "Rainbow"
       - "Analog"
+      - "Solid"
     initial_option: "Fast"
     optimistic: true
     restore_value: true
@@ -293,8 +273,8 @@ select:
             // Map name → mode index (matches MODE_* in oraquadra.h)
             const char *opts[] = {"Fade","Slow","Fast","Matrix","Matrix2","Tron",
                                   "Moto","Galaga","Pacman","Digitale","Drop",
-                                  "Rainbow","Analog"};
-            for (uint8_t i = 0; i < 13; i++) {
+                                  "Rainbow","Analog","Solid"};
+            for (uint8_t i = 0; i < 14; i++) {
               if (x == opts[i]) {
                 id(oraquadra_component)->set_mode(i);
                 return;

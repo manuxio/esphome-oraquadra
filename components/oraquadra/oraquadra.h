@@ -30,6 +30,7 @@
 #include "effect.h"
 #include "words_effect.h"
 #include "analog_effect.h"
+#include "solid_effect.h"
 
 namespace esphome {
 namespace oraquadra {
@@ -48,6 +49,7 @@ enum Mode : uint8_t {
   MODE_DROP     = 10,
   MODE_RAINBOW  = 11,
   MODE_ANALOG   = 12,
+  MODE_SOLID    = 13,   // fill matrix with current color (HA "all on" use case)
   NUM_MODES
 };
 
@@ -67,18 +69,15 @@ class OraquadraComponent : public Component {
 
   // ---- HA-driven config (called from YAML lambdas) ------------------------
   void set_mode(uint8_t mode);
+  void cycle_mode() { set_mode((current_mode_ + 1) % NUM_MODES); }
   void set_color_preset(uint8_t idx);
-  // NOTE on brightness setters: do NOT call apply_brightness_for_now() here.
-  // Number/switch entities with restore_value: true fire on_value during
-  // THEIR setup, and template entity setup runs before this component's
-  // setup() — light_state_->output_ is still null. apply_brightness_for_now
-  // would then call into LightState::set_immediately_ → null deref crash.
-  // Instead just store the value; on_boot (priority -100, after all setups)
-  // calls apply_brightness_for_now once we're safe.
-  void set_brightness_day(uint8_t b)   { brightness_day_ = b; if (boot_done_) apply_brightness_for_now(); }
-  void set_brightness_night(uint8_t b) { brightness_night_ = b; if (boot_done_) apply_brightness_for_now(); }
+  // Brightness setters are now safe to call any time — we don't touch the
+  // LightState anymore (which used to crash during early restore). Brightness
+  // is applied per-pixel at the end of every render via current_brightness_().
+  void set_brightness_day(uint8_t b)   { brightness_day_ = b; }
+  void set_brightness_night(uint8_t b) { brightness_night_ = b; }
   void set_scroll_speed_ms(uint16_t ms){ state_.scroll_speed_ms = ms; }
-  void set_sleep_mode(bool on)         { sleep_mode_ = on; if (boot_done_) apply_brightness_for_now(); }
+  void set_sleep_mode(bool on)         { sleep_mode_ = on; }
   void set_blink_seconds(bool on)      { state_.blink_seconds = on; }
   void set_iaq_frame(bool on)          { iaq_frame_enabled_ = on; }
   void set_scroll_text(const std::string &t) { scroll_text_ = t; }
@@ -108,6 +107,7 @@ class OraquadraComponent : public Component {
   Effect *current_effect_();
   Color iaq_color_for_(float iaq) const;
   bool is_night_now_() const;
+  uint8_t current_brightness_() const;
 
   // ---- Wiring -------------------------------------------------------------
   // The YAML id references an AddressableLightState; we get the underlying

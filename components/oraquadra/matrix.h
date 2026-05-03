@@ -35,6 +35,8 @@ class Matrix {
   // ---- bulk operations -----------------------------------------------------
   void clear();              // zero out every pixel
   void clear_inner();        // zero out the inner 14×14 (cornice preserved)
+  void fill(Color c);        // every pixel = c
+  void apply_global_brightness(uint8_t b);  // scale every pixel by b/255
   void show();               // commit buffer to the LED strip
 
   // ---- pixel access --------------------------------------------------------

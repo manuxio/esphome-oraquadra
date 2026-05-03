@@ -33,6 +33,27 @@ void Matrix::clear_inner() {
   }
 }
 
+void Matrix::fill(Color c) {
+  if (strip_ == nullptr) return;
+  for (uint16_t i = 0; i < NUM_LEDS; i++)
+    (*strip_)[i] = c;
+}
+
+void Matrix::apply_global_brightness(uint8_t b) {
+  if (strip_ == nullptr) return;
+  // Scale every pixel by b/255 in-place. Cheap (256 px × 3 chans × 1 mul).
+  // We do this at the END of render so per-effect colors stay declarative
+  // and the brightness controls behave like a global dimmer.
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    auto view = (*strip_)[i];
+    Color c = view.get();
+    c.r = static_cast<uint8_t>((c.r * b) >> 8);
+    c.g = static_cast<uint8_t>((c.g * b) >> 8);
+    c.b = static_cast<uint8_t>((c.b * b) >> 8);
+    view = c;
+  }
+}
+
 void Matrix::show() {
   if (strip_ == nullptr) return;
   strip_->schedule_show();

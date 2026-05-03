@@ -75,6 +75,7 @@ void OraquadraComponent::setup() {
   effects_[MODE_DROP]    = std::make_unique<WordsEffect>();
   effects_[MODE_RAINBOW] = std::make_unique<WordsEffect>();
   effects_[MODE_ANALOG]  = std::make_unique<AnalogEffect>();
+  effects_[MODE_SOLID]   = std::make_unique<SolidEffect>();
 
   state_.language = language_.get();
   state_.color    = COLOR_PRESETS[color_preset_idx_];
@@ -117,6 +118,11 @@ void OraquadraComponent::render_() {
       effect->update(millis(), *matrix_, state_);
     }
   }
+
+  // Apply global brightness (day/night/sleep) as a final pass so individual
+  // effects can declare colors at full saturation without each having to
+  // implement dimming themselves.
+  matrix_->apply_global_brightness(current_brightness_());
 
   matrix_->show();
 }
@@ -186,15 +192,14 @@ bool OraquadraComponent::is_night_now_() const {
 }
 
 void OraquadraComponent::apply_brightness_for_now() {
-  // Defensive: LightState->set_immediately_ derefs output_ which may still
-  // be null if we're called before all setup completes (e.g. number entity
-  // restoring its value during ITS setup invokes our setter, which used to
-  // call this — see boot_done_ guard in the setters).
-  if (light_state_ == nullptr || light_output_ == nullptr || !boot_done_) return;
-  uint8_t b = sleep_mode_ ? 0 : (is_night_now_() ? brightness_night_ : brightness_day_);
-  auto call = light_state_->turn_on();
-  call.set_brightness(b / 255.0f);
-  call.perform();
+  // No-op now: we don't drive the LightState anymore. Brightness is applied
+  // per-pixel at the end of render_(). Kept as a stub so the on_time YAML
+  // triggers and on_boot lambda still link.
+}
+
+uint8_t OraquadraComponent::current_brightness_() const {
+  if (sleep_mode_) return 0;
+  return is_night_now_() ? brightness_night_ : brightness_day_;
 }
 
 void OraquadraComponent::boot_completed() {
