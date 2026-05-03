@@ -76,7 +76,10 @@ class Matrix {
 // "12 o'clock" position on the cornice ring. Adjust if the matrix is mounted
 // rotated. Could be made YAML-configurable later.
 inline constexpr uint8_t CORNICE_TOP_OFFSET = 8;
-inline constexpr bool    CORNICE_CLOCKWISE  = true;
+// CORNICE array traversal happens to go counter-clockwise on this serpentine
+// matrix layout (top R→L, left T→B, bottom L→R, right B→T). For the analog
+// clock we want hands to move clockwise, so we INVERT the minute index.
+inline constexpr bool    CORNICE_CLOCKWISE  = false;
 
 }  // namespace oraquadra
 }  // namespace esphome
