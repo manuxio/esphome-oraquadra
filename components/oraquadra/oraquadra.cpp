@@ -77,6 +77,7 @@ void OraquadraComponent::setup() {
   effects_[MODE_RAINBOW] = std::make_unique<RainbowEffect>();
   effects_[MODE_ANALOG]  = std::make_unique<AnalogEffect>();
   effects_[MODE_SOLID]   = std::make_unique<SolidEffect>();
+  effects_[MODE_SCROLL]  = std::make_unique<ScrollEffect>();
 
   state_.language = language_.get();
   state_.color    = COLOR_PRESETS[color_preset_idx_];
@@ -272,6 +273,33 @@ void OraquadraComponent::set_color_preset(uint8_t idx) {
 
 void OraquadraComponent::set_iaq(float iaq) {
   last_iaq_ = iaq;
+}
+
+void OraquadraComponent::set_scroll_text(const std::string &t) {
+  scroll_text_ = t;
+  // Push the new text into the ScrollEffect so MODE_SCROLL renders it
+  // immediately. We cast because effects_[] holds Effect* and ScrollEffect's
+  // set_text is not on the base interface.
+  if (effects_[MODE_SCROLL]) {
+    static_cast<ScrollEffect *>(effects_[MODE_SCROLL].get())->set_text(t.c_str());
+  }
+}
+
+void OraquadraComponent::notify(const std::string &text,
+                                const std::string &icon,
+                                const std::string &color, int duration,
+                                int priority, const std::string &layout) {
+  // Build a JSON payload from the parameters and feed it through the
+  // existing parser — keeps the JSON path as the single source of truth
+  // for validation, defaults, and priority handling.
+  std::string json = "{\"text\":\"" + text + "\"";
+  if (!icon.empty())  json += ",\"icon\":\"" + icon + "\"";
+  if (!color.empty()) json += ",\"color\":\"" + color + "\"";
+  if (duration > 0)   json += ",\"duration\":" + std::to_string(duration);
+  if (priority >= 0)  json += ",\"priority\":" + std::to_string(priority);
+  if (!layout.empty()) json += ",\"layout\":\"" + layout + "\"";
+  json += "}";
+  notifications_.enqueue_from_json(json);
 }
 
 void OraquadraComponent::set_iaq_accuracy(float accuracy) {

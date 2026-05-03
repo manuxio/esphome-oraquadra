@@ -42,6 +42,7 @@
 #include "galaga_effect.h"
 #include "pacman_effect.h"
 #include "digital_effect.h"
+#include "scroll_effect.h"
 
 namespace esphome {
 namespace oraquadra {
@@ -61,6 +62,7 @@ enum Mode : uint8_t {
   MODE_RAINBOW  = 11,
   MODE_ANALOG   = 12,
   MODE_SOLID    = 13,   // fill matrix with current color (HA "all on" use case)
+  MODE_SCROLL   = 14,   // scroll the user-configured text continuously
   NUM_MODES
 };
 
@@ -94,7 +96,12 @@ class OraquadraComponent : public Component {
   void set_sleep_mode(bool on)         { sleep_mode_ = on; }
   void set_blink_seconds(bool on)      { state_.blink_seconds = on; }
   void set_iaq_frame(bool on)          { iaq_frame_enabled_ = on; }
-  void set_scroll_text(const std::string &t) { scroll_text_ = t; }
+  void set_scroll_text(const std::string &t);
+  // Convenience: HA pushes a one-shot notification. Used by the api.services
+  // so HA can call it directly with arguments instead of building JSON.
+  void notify(const std::string &text, const std::string &icon,
+              const std::string &color, int duration, int priority,
+              const std::string &layout);
   // Two separate setters so the YAML doesn't need a cross-sensor reference
   // (which would create a circular codegen dependency inside the BME680
   // sensor block).

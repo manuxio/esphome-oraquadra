@@ -71,6 +71,55 @@ api:
   id: api_id
   encryption:
     key: !secret api_key
+  # Custom services exposed to Home Assistant. From HA you call these as
+  # `service: esphome.<node_name>_<service_name>` with parameters in `data`.
+  # No JSON-building required — pass each field separately.
+  actions:
+    # Send a notification with all options as separate fields. Example HA call:
+    #   service: esphome.oraquadra_notify
+    #   data:
+    #     text: "WARNING STORM"
+    #     icon: "warning"
+    #     color: "#ff0000"
+    #     duration: 15
+    #     priority: 3
+    #     layout: "alternating"
+    - action: notify
+      variables:
+        text: string
+        icon: string
+        color: string
+        duration: int
+        priority: int
+        layout: string
+      then:
+        - lambda: id(oraquadra_component)->notify(text, icon, color, duration, priority, layout);
+
+    # Quick "scroll a banner" — sets the scroll text and switches to MODE_SCROLL.
+    # Useful for one-shot messages without notification queue overhead.
+    - action: scroll_banner
+      variables:
+        text: string
+      then:
+        - lambda: |-
+            id(oraquadra_component)->set_scroll_text(text);
+            id(oraquadra_component)->set_mode(14);  // MODE_SCROLL
+
+    # Common-case shortcut: warn icon + red color + alert priority
+    - action: notify_warning
+      variables:
+        text: string
+      then:
+        - lambda: |-
+            id(oraquadra_component)->notify(text, "warning", "#ff0000", 15, 3, "alternating");
+
+    # Common-case shortcut: info icon + user color + info priority
+    - action: notify_info
+      variables:
+        text: string
+      then:
+        - lambda: |-
+            id(oraquadra_component)->notify(text, "info", "", 10, 1, "alternating");
 
 ota:
   - platform: esphome
@@ -296,6 +345,7 @@ select:
       - "Rainbow"
       - "Analog"
       - "Solid"
+      - "Scroll"
     initial_option: "Fast"
     optimistic: true
     restore_value: true
@@ -305,8 +355,8 @@ select:
             // Map name → mode index (matches MODE_* in oraquadra.h)
             const char *opts[] = {"Fade","Slow","Fast","Matrix","Matrix2","Tron",
                                   "Moto","Galaga","Pacman","Digitale","Drop",
-                                  "Rainbow","Analog","Solid"};
-            for (uint8_t i = 0; i < 14; i++) {
+                                  "Rainbow","Analog","Solid","Scroll"};
+            for (uint8_t i = 0; i < 15; i++) {
               if (x == opts[i]) {
                 id(oraquadra_component)->set_mode(i);
                 return;
