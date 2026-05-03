@@ -86,40 +86,40 @@ api:
     #     layout: "alternating"
     - service: notify
       variables:
-        text: string
+        msg: string
         icon: string
         color: string
         duration: int
         priority: int
         layout: string
       then:
-        - lambda: id(oraquadra_component)->notify(text, icon, color, duration, priority, layout);
+        - lambda: id(oraquadra_component)->notify(msg, icon, color, duration, priority, layout);
 
     # Quick "scroll a banner" — sets the scroll text and switches to MODE_SCROLL.
     # Useful for one-shot messages without notification queue overhead.
     - service: scroll_banner
       variables:
-        text: string
+        msg: string
       then:
         - lambda: |-
-            id(oraquadra_component)->set_scroll_text(text);
+            id(oraquadra_component)->set_scroll_text(msg);
             id(oraquadra_component)->set_mode(14);  // MODE_SCROLL
 
     # Common-case shortcut: warn icon + red color + alert priority
     - service: notify_warning
       variables:
-        text: string
+        msg: string
       then:
         - lambda: |-
-            id(oraquadra_component)->notify(text, "warning", "#ff0000", 15, 3, "alternating");
+            id(oraquadra_component)->notify(msg, "warning", "#ff0000", 15, 3, "alternating");
 
     # Common-case shortcut: info icon + user color + info priority
     - service: notify_info
       variables:
-        text: string
+        msg: string
       then:
         - lambda: |-
-            id(oraquadra_component)->notify(text, "info", "", 10, 1, "alternating");
+            id(oraquadra_component)->notify(msg, "info", "", 10, 1, "alternating");
 
 ota:
   - platform: esphome
