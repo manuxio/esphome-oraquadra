@@ -253,10 +253,10 @@ light:
     pin: GPIO4
     num_leds: 256
     chipset: WS2812
-    # Larger symbol buffer reduces the chance of RMT underruns when the
-    # CPU is busy with WiFi / BSEC2 / our render loop — a likely cause of
-    # occasional random pixel flicker on long strips.
-    rmt_symbols: 384
+    # ESP32-C3's RMT peripheral has only 192 symbol slots total (4 blocks ×
+    # 48). Setting rmt_symbols above 192 causes rmt_tx_wait_all_done() to
+    # fail with "invalid argument" and the strip to glitch random pixels.
+    # We use the default by leaving this unset.
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
