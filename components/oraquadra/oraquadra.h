@@ -110,6 +110,16 @@ class OraquadraComponent : public Component {
   void notify(const std::string &text, const std::string &icon,
               const std::string &color, int duration, int priority,
               const std::string &layout);
+  // Display a 16×16 RGB pixel-art frame for `duration` seconds via the
+  // notification queue.
+  //   palette : up to 16 comma-separated colours, "rrggbb" or "#rrggbb",
+  //             e.g. "ff0000,00ff00,0000ff"
+  //   pixels  : 256 chars in row-major order. '.' = transparent, 0..9 =
+  //             palette index 0..9, a..f = palette index 10..15
+  //             (also accepts uppercase A..F). Whitespace is skipped so
+  //             the caller may pretty-format with newlines/spaces.
+  void show_pixel_art(const std::string &palette, const std::string &pixels,
+                      int duration, int priority);
   // Two separate setters so the YAML doesn't need a cross-sensor reference
   // (which would create a circular codegen dependency inside the BME680
   // sensor block).
@@ -143,6 +153,7 @@ class OraquadraComponent : public Component {
   void paint_notif_alternating_(const Notification &n, uint32_t elapsed_ms);
   void paint_notif_split_(const Notification &n, uint32_t elapsed_ms);
   void paint_notif_icon_only_(const Notification &n);
+  void paint_notif_pixel_art_();
   void paint_icon_full_(const char *icon_name, Color c);
   void paint_icon_8_(const char *icon_name, uint8_t x0, uint8_t y0, Color c);
   void paint_scroll_text_full_(const char *text, Color c, uint32_t scroll_ms);
@@ -217,6 +228,13 @@ class OraquadraComponent : public Component {
 
   // ---- Notifications ------------------------------------------------------
   NotificationQueue notifications_;
+
+  // ---- Pixel-art (single slot, overwritten on each show_pixel_art call) ---
+  // Filled by show_pixel_art(); consumed by paint_notif_pixel_art_() when a
+  // notification with layout=PIXEL_ART is active. mask_[i] = false means the
+  // pixel is transparent and the underlying frame (clear/IAQ) shows through.
+  Color pixel_art_[Matrix::NUM_LEDS]{};
+  bool  pixel_art_mask_[Matrix::NUM_LEDS]{};
 };
 
 }  // namespace oraquadra

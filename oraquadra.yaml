@@ -124,6 +124,26 @@ api:
         - lambda: |-
             id(oraquadra_component)->notify(msg, "info", "", 10, 1, "alternating");
 
+    # Pixel-art display. Send a 16x16 RGB picture in two strings:
+    #   palette: up to 16 comma-separated colours, "rrggbb" or "#rrggbb"
+    #            e.g. "ff0000,00ff00,0000ff,ffffff"
+    #   pixels:  256 chars in row-major order. '.' = transparent (lets the
+    #            background show through), 0..9 / a..f = palette index 0..15.
+    #            Whitespace is ignored, so you can pretty-format with newlines:
+    #              "................"
+    #              ".....0000......."
+    #              "...0011110......" ...
+    # The art is queued through the notification system, so it honours
+    # `priority` and auto-expires after `duration` seconds.
+    - service: pixel_art
+      variables:
+        palette: string
+        pixels: string
+        duration: int
+        priority: int
+      then:
+        - lambda: id(oraquadra_component)->show_pixel_art(palette, pixels, duration, priority);
+
 ota:
   - platform: esphome
     password: !secret ota_password

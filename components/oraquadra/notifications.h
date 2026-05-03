@@ -47,6 +47,10 @@ enum class NotificationLayout : uint8_t {
   // Icon centered in matrix; text is NOT rendered (caller can put it in the
   // scroll_text entity instead). Lightest visual, useful for ambient alerts.
   ICON_ONLY   = 2,
+  // Full-colour 16×16 pixel-art frame painted from the component's
+  // pixel_art buffer (single slot — latest call wins). Set via
+  // show_pixel_art() service.
+  PIXEL_ART   = 3,
 };
 
 struct Notification {

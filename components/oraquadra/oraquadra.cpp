@@ -203,6 +203,13 @@ void OraquadraComponent::paint_notification_(const Notification &n) {
     case NotificationLayout::ALTERNATING: paint_notif_alternating_(n, elapsed); break;
     case NotificationLayout::SPLIT:       paint_notif_split_(n, elapsed); break;
     case NotificationLayout::ICON_ONLY:   paint_notif_icon_only_(n); break;
+    case NotificationLayout::PIXEL_ART:   paint_notif_pixel_art_(); break;
+  }
+}
+
+void OraquadraComponent::paint_notif_pixel_art_() {
+  for (uint16_t i = 0; i < Matrix::NUM_LEDS; i++) {
+    if (pixel_art_mask_[i]) matrix_->set_pixel(i, pixel_art_[i]);
   }
 }
 
@@ -359,6 +366,79 @@ void OraquadraComponent::set_scroll_text(const std::string &t) {
   } else if (t.empty() && current_mode_ == MODE_SCROLL) {
     set_mode(saved_mode_before_scroll_);
   }
+}
+
+// Parse one "rrggbb" or "#rrggbb" hex token to a Color. Returns black on
+// malformed input.
+static Color parse_hex(const std::string &t) {
+  const char *s = t.c_str();
+  if (*s == '#') s++;
+  if (std::strlen(s) < 6) return Color{0, 0, 0};
+  auto hx = [](char c) -> uint8_t {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return 10 + c - 'a';
+    if (c >= 'A' && c <= 'F') return 10 + c - 'A';
+    return 0;
+  };
+  return Color{
+      static_cast<uint8_t>((hx(s[0]) << 4) | hx(s[1])),
+      static_cast<uint8_t>((hx(s[2]) << 4) | hx(s[3])),
+      static_cast<uint8_t>((hx(s[4]) << 4) | hx(s[5])),
+  };
+}
+
+void OraquadraComponent::show_pixel_art(const std::string &palette,
+                                        const std::string &pixels,
+                                        int duration, int priority) {
+  // 1. Parse palette into up to 16 colours.
+  Color pal[16];
+  uint8_t pal_n = 0;
+  size_t i = 0;
+  while (i < palette.size() && pal_n < 16) {
+    size_t j = palette.find(',', i);
+    if (j == std::string::npos) j = palette.size();
+    pal[pal_n++] = parse_hex(palette.substr(i, j - i));
+    i = j + 1;
+  }
+  if (pal_n == 0) {
+    ESP_LOGW(TAG, "pixel_art: empty palette, ignoring");
+    return;
+  }
+
+  // 2. Walk the pixels string, skipping whitespace. Map char → palette idx.
+  std::memset(pixel_art_mask_, 0, sizeof(pixel_art_mask_));
+  uint16_t led = 0;
+  for (char c : pixels) {
+    if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
+    if (led >= Matrix::NUM_LEDS) break;
+    if (c == '.') {
+      pixel_art_mask_[led] = false;  // transparent
+    } else {
+      uint8_t idx = 255;
+      if (c >= '0' && c <= '9') idx = c - '0';
+      else if (c >= 'a' && c <= 'f') idx = 10 + (c - 'a');
+      else if (c >= 'A' && c <= 'F') idx = 10 + (c - 'A');
+      if (idx < pal_n) {
+        pixel_art_[led] = pal[idx];
+        pixel_art_mask_[led] = true;
+      }  // unknown char → leave transparent
+    }
+    led++;
+  }
+  if (led < Matrix::NUM_LEDS) {
+    ESP_LOGW(TAG, "pixel_art: only %u/256 pixels provided; rest transparent",
+             static_cast<unsigned>(led));
+  }
+
+  // 3. Push as a notification with layout PIXEL_ART. Reusing the queue
+  //    gives us priority handling and auto-expire for free.
+  std::string json = "{\"text\":\"\",\"layout\":\"pixel_art\"";
+  if (duration > 0) json += ",\"duration\":" + std::to_string(duration);
+  if (priority >= 0) json += ",\"priority\":" + std::to_string(priority);
+  json += "}";
+  notifications_.enqueue_from_json(json);
+  ESP_LOGI(TAG, "pixel_art queued: palette=%u, pixels=%u, dur=%ds",
+           pal_n, static_cast<unsigned>(led), duration);
 }
 
 void OraquadraComponent::notify(const std::string &text,

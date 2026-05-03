@@ -54,6 +54,8 @@ bool NotificationQueue::enqueue_from_json(const std::string &payload) {
         n.layout = NotificationLayout::SPLIT;
       } else if (std::strcmp(layout_str, "icon_only") == 0) {
         n.layout = NotificationLayout::ICON_ONLY;
+      } else if (std::strcmp(layout_str, "pixel_art") == 0) {
+        n.layout = NotificationLayout::PIXEL_ART;
       } else {
         n.layout = NotificationLayout::ALTERNATING;  // default
       }
