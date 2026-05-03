@@ -31,6 +31,17 @@
 #include "words_effect.h"
 #include "analog_effect.h"
 #include "solid_effect.h"
+#include "rainbow_effect.h"
+#include "slow_effect.h"
+#include "fade_effect.h"
+#include "matrix_effect.h"
+#include "matrix2_effect.h"
+#include "drop_effect.h"
+#include "tron_effect.h"
+#include "moto_effect.h"
+#include "galaga_effect.h"
+#include "pacman_effect.h"
+#include "digital_effect.h"
 
 namespace esphome {
 namespace oraquadra {

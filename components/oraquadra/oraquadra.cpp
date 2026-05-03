@@ -62,18 +62,18 @@ void OraquadraComponent::setup() {
   // Effect registry. Modes 3..11 (matrix, tron, pacman, etc.) are stubs for
   // now — they fall back to the Words effect until the V1.2.9 effects port
   // (Phase 4 of the plan) lands.
-  effects_[MODE_FADE]    = std::make_unique<WordsEffect>();
-  effects_[MODE_SLOW]    = std::make_unique<WordsEffect>();
+  effects_[MODE_FADE]    = std::make_unique<FadeEffect>();
+  effects_[MODE_SLOW]    = std::make_unique<SlowEffect>();
   effects_[MODE_FAST]    = std::make_unique<WordsEffect>();
-  effects_[MODE_MATRIX]  = std::make_unique<WordsEffect>();
-  effects_[MODE_MATRIX2] = std::make_unique<WordsEffect>();
-  effects_[MODE_TRON]    = std::make_unique<WordsEffect>();
-  effects_[MODE_MOTO]    = std::make_unique<WordsEffect>();
-  effects_[MODE_GALAGA]  = std::make_unique<WordsEffect>();
-  effects_[MODE_PACMAN]  = std::make_unique<WordsEffect>();
-  effects_[MODE_DIGITAL] = std::make_unique<WordsEffect>();
-  effects_[MODE_DROP]    = std::make_unique<WordsEffect>();
-  effects_[MODE_RAINBOW] = std::make_unique<WordsEffect>();
+  effects_[MODE_MATRIX]  = std::make_unique<MatrixEffect>();
+  effects_[MODE_MATRIX2] = std::make_unique<Matrix2Effect>();
+  effects_[MODE_TRON]    = std::make_unique<TronEffect>();
+  effects_[MODE_MOTO]    = std::make_unique<MotoEffect>();
+  effects_[MODE_GALAGA]  = std::make_unique<GalagaEffect>();
+  effects_[MODE_PACMAN]  = std::make_unique<PacmanEffect>();
+  effects_[MODE_DIGITAL] = std::make_unique<DigitalEffect>();
+  effects_[MODE_DROP]    = std::make_unique<DropEffect>();
+  effects_[MODE_RAINBOW] = std::make_unique<RainbowEffect>();
   effects_[MODE_ANALOG]  = std::make_unique<AnalogEffect>();
   effects_[MODE_SOLID]   = std::make_unique<SolidEffect>();
 
