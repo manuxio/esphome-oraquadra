@@ -39,10 +39,11 @@ esp32:
   board: esp32-c3-devkitm-1
   variant: esp32c3
   framework:
-    type: esp-idf
-    # ESP-IDF: smaller binary, faster builds, better RTOS scheduling.
-    # If/when bme68x_bsec2 is re-enabled, may need a workaround if the
-    # ESPHome integration is still Arduino-only on this version.
+    type: arduino
+    # Arduino framework chosen so we can use the neopixelbus driver, which
+    # avoids the random pixel glitches that ESPHome's esp32_rmt_led_strip
+    # produced on this chip (visible even on a fully-static frame in
+    # Diagnostic mode). Tradeoff: ~30% larger binary, slower builds.
 
 logger:
   # Global ceiling = VERBOSE so we can see I2C transactions and BME680
@@ -245,25 +246,21 @@ sensor:
 
 # ============================================================================
 # LED strip — internal: not exposed to HA; component drives it directly.
-# Explicit bit timing (instead of `chipset: WS2812` preset) — preset on
-# this ESPHome version produced random pixel glitches even on a fully-
-# static frame; values below are middle-of-tolerance per the WS2812(B)
-# datasheet which is more forgiving for clone strips.
-# (NeoPixelBus would have been the textbook fix but it requires the
-# Arduino framework; we're on ESP-IDF for the smaller binary.)
+# Uses neopixelbus (Arduino-only library) instead of esp32_rmt_led_strip:
+# the ESPHome RMT driver produced random pixel glitches on a fully-static
+# frame on ESP32-C3 (only 48-symbol RMT buffer, prone to underrun under
+# WiFi load). NeoPixelBus's RMT backend uses larger buffers and matches
+# what FastLED on the original .ino did — that build was rock-solid.
 # ============================================================================
 light:
-  - platform: esp32_rmt_led_strip
+  - platform: neopixelbus
     id: matrix_strip
-    rgb_order: GRB
+    type: GRB
+    variant: WS2812X
     pin: GPIO4
     num_leds: 256
-    # WS2812(B) datasheet: T0H 350±150, T0L 800±150, T1H 700±150,
-    # T1L 600±150 ns. Mid values below; safe for both WS2812 and WS2812B.
-    bit0_high: "400ns"
-    bit0_low:  "850ns"
-    bit1_high: "800ns"
-    bit1_low:  "450ns"
+    method:
+      type: esp32_rmt
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
