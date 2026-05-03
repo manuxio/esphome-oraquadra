@@ -348,7 +348,10 @@ switch:
     name: "${friendly_name} Sleep Mode"
     id: oraquadra_sleep_mode
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
+    # ALWAYS_OFF on every boot — sleep is a transient mode the user toggles
+    # at runtime, never desirable to silently restore at boot (was the cause
+    # of "matrix is dark after flash" troubleshooting).
+    restore_mode: ALWAYS_OFF
     turn_on_action:
       - lambda: id(oraquadra_component)->set_sleep_mode(true);
     turn_off_action:
