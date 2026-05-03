@@ -18,11 +18,13 @@ const uint16_t Matrix::CORNICE[Matrix::CORNICE_LEN] = {
 };
 
 void Matrix::clear() {
+  if (strip_ == nullptr) return;
   for (uint16_t i = 0; i < NUM_LEDS; i++)
     (*strip_)[i] = Color::BLACK;
 }
 
 void Matrix::clear_inner() {
+  if (strip_ == nullptr) return;
   // The inner 14×14 starts at (1, 1) and ends at (14, 14).
   for (uint8_t y = 1; y < HEIGHT - 1; y++) {
     for (uint8_t x = 1; x < WIDTH - 1; x++) {
@@ -32,11 +34,12 @@ void Matrix::clear_inner() {
 }
 
 void Matrix::show() {
+  if (strip_ == nullptr) return;
   strip_->schedule_show();
 }
 
 void Matrix::set_pixel(uint16_t led, Color c) {
-  if (led >= NUM_LEDS) return;
+  if (strip_ == nullptr || led >= NUM_LEDS) return;
   (*strip_)[led] = c;
 }
 

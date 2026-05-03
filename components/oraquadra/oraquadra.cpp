@@ -38,9 +38,25 @@ void OraquadraComponent::setup() {
     mark_failed();
     return;
   }
-  // The YAML schema (cv.use_id(light.AddressableLightState)) guarantees the
-  // wrapped output is an AddressableLight, so the static_cast is safe.
-  light_output_ = static_cast<light::AddressableLight *>(light_state_->get_output());
+
+  // Get the addressable light output. AddressableLightState should override
+  // get_output() to return AddressableLight*, but we defensively handle the
+  // case where the cast yields null (e.g., output not yet wired, or actually
+  // a non-addressable light).
+  auto *raw_output = light_state_->get_output();
+  if (raw_output == nullptr) {
+    ESP_LOGE(TAG, "light_state->get_output() returned null — light not addressable?");
+    mark_failed();
+    return;
+  }
+  light_output_ = static_cast<light::AddressableLight *>(raw_output);
+  if (light_output_ == nullptr) {
+    ESP_LOGE(TAG, "light output is not an AddressableLight — refusing to start");
+    mark_failed();
+    return;
+  }
+  ESP_LOGI(TAG, "light output OK: %u pixels", light_output_->size());
+
   matrix_ = std::make_unique<Matrix>(light_output_);
 
   // Effect registry. Modes 3..11 (matrix, tron, pacman, etc.) are stubs for
