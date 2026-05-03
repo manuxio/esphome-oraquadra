@@ -244,7 +244,13 @@ sensor:
     entity_category: diagnostic
 
 # ============================================================================
-# LED strip — internal: not exposed to HA; component drives it directly
+# LED strip — internal: not exposed to HA; component drives it directly.
+# Explicit bit timing (instead of `chipset: WS2812` preset) — preset on
+# this ESPHome version produced random pixel glitches even on a fully-
+# static frame; values below are middle-of-tolerance per the WS2812(B)
+# datasheet which is more forgiving for clone strips.
+# (NeoPixelBus would have been the textbook fix but it requires the
+# Arduino framework; we're on ESP-IDF for the smaller binary.)
 # ============================================================================
 light:
   - platform: esp32_rmt_led_strip
@@ -252,11 +258,12 @@ light:
     rgb_order: GRB
     pin: GPIO4
     num_leds: 256
-    chipset: WS2812
-    # ESP32-C3's RMT peripheral has only 192 symbol slots total (4 blocks ×
-    # 48). Setting rmt_symbols above 192 causes rmt_tx_wait_all_done() to
-    # fail with "invalid argument" and the strip to glitch random pixels.
-    # We use the default by leaving this unset.
+    # WS2812(B) datasheet: T0H 350±150, T0L 800±150, T1H 700±150,
+    # T1L 600±150 ns. Mid values below; safe for both WS2812 and WS2812B.
+    bit0_high: "400ns"
+    bit0_low:  "850ns"
+    bit1_high: "800ns"
+    bit1_low:  "450ns"
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
