@@ -14,19 +14,17 @@ esphome:
   platformio_options:
     build_cache_dir: /cache/pio_build_cache
   on_boot:
-    # HIGH priority (after light HW init at 800, before user code):
-    # turn light ON @ 100% brightness BLACK color. ESPHome's output stage
-    # scales pixels by LightState brightness (1.0 here = pass-through), but
-    # the buffer is all-black so no LED draws current. No boot-time current
-    # spike, no USB brown-out.
+    # HIGH priority (after light HW init): pin LightState to ON @ 100%
+    # brightness with our custom effect "OraQuadra" active. The effect is a
+    # no-op lambda — when it's the active effect, ESPHome's update_state
+    # bypasses its solid-color renderer and leaves the buffer to us. Our
+    # component writes pixels every loop; nothing else stomps on them.
     - priority: 700
       then:
         - light.turn_on:
             id: matrix_strip
             brightness: 100%
-            red: 0%
-            green: 0%
-            blue: 0%
+            effect: "OraQuadra"
             transition_length: 0s
     - priority: -100
       then:
@@ -200,12 +198,19 @@ light:
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
-    # ALWAYS_OFF at boot, then turned ON @ BLACK by on_boot priority 700.
-    # This avoids the restore_mode auto-paint of all 256 LEDs at default
-    # color (white at full brightness) which would spike ~15 A and brown
-    # out USB. After the boot lambda settles things, brightness multiplier
-    # = 1.0 and our buffer values pass through unchanged.
-    restore_mode: ALWAYS_OFF
+    restore_mode: ALWAYS_ON
+    # Custom effect: a no-op addressable_lambda. When this effect is the
+    # ACTIVE one, ESPHome's AddressableLight::update_state early-returns
+    # without painting the buffer — leaves it to us. Our oraquadra component
+    # writes pixels every loop into the buffer; this effect just does
+    # nothing and prevents the LightState's solid-color renderer from
+    # stomping our work. Activated at boot via boot_completed().
+    effects:
+      - addressable_lambda:
+          name: "OraQuadra"
+          update_interval: 50ms
+          lambda: |-
+            // intentionally empty — buffer is owned by oraquadra component
 
 # ============================================================================
 # Single button on GPIO 5 (custom PCB has only one).
