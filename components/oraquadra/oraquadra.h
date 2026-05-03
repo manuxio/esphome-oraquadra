@@ -22,7 +22,6 @@
 #include "esphome/core/color.h"
 #include "esphome/components/light/addressable_light.h"
 #include "esphome/components/time/real_time_clock.h"
-#include "esphome/components/sensor/sensor.h"
 
 #include "matrix.h"
 #include "language.h"
@@ -63,8 +62,8 @@ class OraquadraComponent : public Component {
   // ---- Wiring (called from codegen / __init__.py) -------------------------
   void set_light(light::AddressableLightState *l) { light_state_ = l; }
   void set_time(time::RealTimeClock *t) { time_ = t; }
-  void set_iaq_sensor(sensor::Sensor *s) { iaq_sensor_ = s; }
-  void set_iaq_accuracy_sensor(sensor::Sensor *s) { iaq_accuracy_sensor_ = s; }
+  // IAQ values arrive via set_iaq() from the BME680's on_value lambda — no
+  // direct sensor pointer needed (avoids a circular codegen dependency).
 
   // ---- HA-driven config (called from YAML lambdas) ------------------------
   void set_mode(uint8_t mode);
@@ -105,8 +104,6 @@ class OraquadraComponent : public Component {
   light::AddressableLightState *light_state_{nullptr};
   light::AddressableLight       *light_output_{nullptr};
   time::RealTimeClock           *time_{nullptr};
-  sensor::Sensor          *iaq_sensor_{nullptr};
-  sensor::Sensor          *iaq_accuracy_sensor_{nullptr};
 
   // ---- Geometry / IO ------------------------------------------------------
   std::unique_ptr<Matrix> matrix_;

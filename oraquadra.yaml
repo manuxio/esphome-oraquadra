@@ -237,8 +237,9 @@ oraquadra:
   id: oraquadra_component
   light_id: matrix_strip
   time_id: ha_time
-  iaq_sensor_id: env_iaq
-  iaq_accuracy_sensor_id: env_iaq_accuracy
+  # IAQ values are pushed in by env_iaq.on_value lambda calling
+  # id(oraquadra_component)->set_iaq(x, accuracy). Do NOT add iaq sensor
+  # IDs here — would create a circular codegen dependency.
 
 # ============================================================================
 # HA-facing entities (Phase 8)

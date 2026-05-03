@@ -87,7 +87,7 @@ void OraquadraComponent::render_() {
   }
 
   // Layer 1: IAQ frame (cornice tinted by air quality).
-  if (iaq_frame_enabled_ && iaq_accuracy_sensor_ != nullptr && last_iaq_accuracy_ > 0) {
+  if (iaq_frame_enabled_ && last_iaq_accuracy_ > 0) {
     paint_iaq_base_layer_();
   }
 
