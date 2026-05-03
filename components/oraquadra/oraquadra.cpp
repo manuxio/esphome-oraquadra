@@ -405,12 +405,18 @@ void OraquadraComponent::show_pixel_art(const std::string &palette,
     return;
   }
 
-  // 2. Walk the pixels string, skipping whitespace. Map char → palette idx.
+  // 2. Walk the pixels string, skipping whitespace. The user gives us a
+  //    visual grid (row-major, left-to-right within each row); we have to
+  //    map (x, y) → LED index via xy_to_led because the matrix is wired
+  //    in serpentine order (even rows reverse their column→LED mapping).
   std::memset(pixel_art_mask_, 0, sizeof(pixel_art_mask_));
-  uint16_t led = 0;
+  uint16_t pos = 0;  // position in the visual grid (0..255)
   for (char c : pixels) {
     if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
-    if (led >= Matrix::NUM_LEDS) break;
+    if (pos >= Matrix::NUM_LEDS) break;
+    const uint8_t x = pos % Matrix::WIDTH;
+    const uint8_t y = pos / Matrix::WIDTH;
+    const uint16_t led = Matrix::xy_to_led(x, y);
     if (c == '.') {
       pixel_art_mask_[led] = false;  // transparent
     } else {
@@ -423,11 +429,11 @@ void OraquadraComponent::show_pixel_art(const std::string &palette,
         pixel_art_mask_[led] = true;
       }  // unknown char → leave transparent
     }
-    led++;
+    pos++;
   }
-  if (led < Matrix::NUM_LEDS) {
+  if (pos < Matrix::NUM_LEDS) {
     ESP_LOGW(TAG, "pixel_art: only %u/256 pixels provided; rest transparent",
-             static_cast<unsigned>(led));
+             static_cast<unsigned>(pos));
   }
 
   // 3. Push as a notification with layout PIXEL_ART. Reusing the queue
@@ -438,7 +444,7 @@ void OraquadraComponent::show_pixel_art(const std::string &palette,
   json += "}";
   notifications_.enqueue_from_json(json);
   ESP_LOGI(TAG, "pixel_art queued: palette=%u, pixels=%u, dur=%ds",
-           pal_n, static_cast<unsigned>(led), duration);
+           pal_n, static_cast<unsigned>(pos), duration);
 }
 
 void OraquadraComponent::notify(const std::string &text,
