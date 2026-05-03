@@ -21,11 +21,15 @@ esphome:
     # component writes pixels every loop; nothing else stomps on them.
     - priority: 700
       then:
+        # Split into two calls: brightness can't share a turn_on with
+        # effect (ESPHome schema rejects them together).
         - light.turn_on:
             id: matrix_strip
             brightness: 100%
-            effect: "OraQuadra"
             transition_length: 0s
+        - light.turn_on:
+            id: matrix_strip
+            effect: "OraQuadra"
     - priority: -100
       then:
         - lambda: |-
