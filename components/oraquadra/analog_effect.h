@@ -28,21 +28,21 @@ class AnalogEffect final : public Effect {
     m.set_pixel(8, 15, tick);   // 6
     m.set_pixel(0,  8, tick);   // 9
 
-    // Brightness scheme (per user request):
-    //   Hour    → 100% of user color (the most prominent)
-    //   Minute  →  50% (mid)
-    //   Seconds →  35% (faintest)
+    // Brightness scheme + priority (per user request):
+    //   Hour    → 100% of user color (foreground, never overwritten)
+    //   Minute  →  50% (mid layer; never overwrites hour pixels)
+    //   Seconds →  35% (background; never overwrites hour or minute pixels)
     //
-    // Draw order: minute base first, seconds in the middle, hour on top, so
-    // hour always reads cleanly and the longer hands extend past the hour
-    // tip with their dimmer trails.
-    const float minute_angle = s.minute * (TWO_PI_ / 60.0f);
-    draw_hand_(m, minute_angle, 7.5f, scale_(s.color, 128));   // 50%
-
+    // Implementation: draw weakest first (seconds) → middle (minute) →
+    // strongest last (hour). Each later draw overwrites earlier pixels at
+    // the intersection, so hour always wins, then minute, then seconds.
     if (s.blink_seconds) {
       const float second_angle = s.second * (TWO_PI_ / 60.0f);
       draw_hand_(m, second_angle, 6.5f, scale_(s.color, 90));  // 35%
     }
+
+    const float minute_angle = s.minute * (TWO_PI_ / 60.0f);
+    draw_hand_(m, minute_angle, 7.5f, scale_(s.color, 128));   // 50%
 
     const float hour_angle =
         ((s.hour % 12) + s.minute / 60.0f) * (TWO_PI_ / 12.0f);
