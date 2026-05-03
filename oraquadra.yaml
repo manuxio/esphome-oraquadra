@@ -39,11 +39,13 @@ esp32:
   board: esp32-c3-devkitm-1
   variant: esp32c3
   framework:
-    type: arduino
-    # Arduino framework chosen so we can use the neopixelbus driver, which
-    # avoids the random pixel glitches that ESPHome's esp32_rmt_led_strip
-    # produced on this chip (visible even on a fully-static frame in
-    # Diagnostic mode). Tradeoff: ~30% larger binary, slower builds.
+    type: esp-idf
+    # ESP-IDF: smaller binary, faster builds. neopixelbus tested but made
+    # the glitching dramatically worse on this hardware; we keep IDF +
+    # esp32_rmt_led_strip with the WS2812 chipset preset as the
+    # least-bad option. Real fix is hardware (3.3V→5V level shifter on
+    # the data line is the standard recommendation for clean WS2812
+    # signaling on ESP32-C3 even with short wire runs).
 
 logger:
   # Global ceiling = VERBOSE so we can see I2C transactions and BME680
@@ -253,14 +255,12 @@ sensor:
 # what FastLED on the original .ino did — that build was rock-solid.
 # ============================================================================
 light:
-  - platform: neopixelbus
+  - platform: esp32_rmt_led_strip
     id: matrix_strip
-    type: GRB
-    variant: WS2812X
+    rgb_order: GRB
     pin: GPIO4
     num_leds: 256
-    method:
-      type: esp32_rmt
+    chipset: WS2812
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
