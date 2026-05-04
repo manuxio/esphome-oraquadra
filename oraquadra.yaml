@@ -161,6 +161,11 @@ wifi:
   password: !secret wifi_password
   ap:
     ssid: "${friendly_name} Setup"
+  # NONE keeps the WiFi modem awake permanently — eliminates the periodic
+  # sleep/wake interrupts that on ESP32-C3 contend with the RMT symbol-
+  # buffer refill thread and cause occasional 1-5 pixel bit-flip glitches
+  # in high-entropy frames. Cost: ~30 mA extra current draw.
+  power_save_mode: NONE
 
 captive_portal:
 
@@ -301,7 +306,10 @@ light:
     effects:
       - addressable_lambda:
           name: "OraQuadra"
-          update_interval: 33ms
+          # 50 ms = 20 fps strip refresh. Drops the RMT busy ratio to
+          # ~16 % so an interrupt is much less likely to overlap an
+          # active transmit on this DMA-less ESP32-C3 RMT path.
+          update_interval: 50ms
           lambda: |-
             id(oraquadra_component)->flush_strip();
 
