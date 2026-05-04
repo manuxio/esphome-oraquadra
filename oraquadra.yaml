@@ -144,6 +144,14 @@ api:
       then:
         - lambda: id(oraquadra_component)->show_pixel_art(palette, pixels, duration, priority);
 
+    # One-call convenience: 16x16 centered gradient heart (pink → deep red).
+    - service: show_heart
+      variables:
+        duration: int
+        priority: int
+      then:
+        - lambda: id(oraquadra_component)->show_heart(duration, priority);
+
 ota:
   - platform: esphome
     password: !secret ota_password

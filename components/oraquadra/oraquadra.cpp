@@ -447,6 +447,31 @@ void OraquadraComponent::show_pixel_art(const std::string &palette,
            pal_n, static_cast<unsigned>(pos), duration);
 }
 
+void OraquadraComponent::show_heart(int duration, int priority) {
+  // 5-step vertical gradient: light pink top → deep red tip. Heart is
+  // mirror-symmetric around col 7.5 and vertically centred (spans rows
+  // 1..14, centre between rows 7 and 8 — the matrix's exact middle).
+  static const char PALETTE[] = "ff8090,ff4060,f02040,c01030,800020";
+  static const char PIXELS[] =
+      "................"
+      "...00......00..."
+      "..0000....0000.."
+      ".111111..111111."
+      ".11111111111111."
+      "2222222222222222"
+      "2222222222222222"
+      ".22222222222222."
+      ".22222222222222."
+      "..333333333333.."
+      "...3333333333..."
+      "....33333333...."
+      ".....444444....."
+      "......4444......"
+      ".......44......."
+      "................";
+  show_pixel_art(PALETTE, PIXELS, duration, priority);
+}
+
 void OraquadraComponent::notify(const std::string &text,
                                 const std::string &icon,
                                 const std::string &color, int duration,

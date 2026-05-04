@@ -120,6 +120,9 @@ class OraquadraComponent : public Component {
   //             the caller may pretty-format with newlines/spaces.
   void show_pixel_art(const std::string &palette, const std::string &pixels,
                       int duration, int priority);
+  // One-call convenience: a centered, gradient-coloured heart. Built on
+  // top of show_pixel_art with a hardcoded palette + grid.
+  void show_heart(int duration, int priority);
   // Two separate setters so the YAML doesn't need a cross-sensor reference
   // (which would create a circular codegen dependency inside the BME680
   // sensor block).
