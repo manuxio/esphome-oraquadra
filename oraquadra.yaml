@@ -294,6 +294,11 @@ light:
     pin: GPIO4
     num_leds: 256
     chipset: WS2812
+    # gamma_correct 1.0 disables the per-pixel gamma lookup that would
+    # run inside the strip's operator=(Color) on every flush_strip()
+    # write. Saves CPU during the 256-pixel copy and reduces the chance
+    # an interrupt overlaps an RMT refill window.
+    gamma_correct: 1.0
     name: "${friendly_name} Matrix"
     internal: true
     default_transition_length: 0s
@@ -306,10 +311,11 @@ light:
     effects:
       - addressable_lambda:
           name: "OraQuadra"
-          # 50 ms = 20 fps strip refresh. Drops the RMT busy ratio to
-          # ~16 % so an interrupt is much less likely to overlap an
-          # active transmit on this DMA-less ESP32-C3 RMT path.
-          update_interval: 50ms
+          # 100 ms = 10 fps strip refresh. Drops the RMT busy ratio to
+          # ~8 %, the lowest reasonable rate while still feeling smooth
+          # for a clock that updates per second. Animations advance in
+          # the shadow at ESPHome loop speed, the lambda just samples.
+          update_interval: 100ms
           lambda: |-
             id(oraquadra_component)->flush_strip();
 
